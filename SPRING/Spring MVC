@@ -1,0 +1,511 @@
+SPRING MVC:
+It’s a module of the Spring framework dealing with the Model-View-Controller or MVC pattern. It combines all the advantages of the MVC pattern with the 
+convenience of Spring.
+Spring implements MVC with the front controller pattern using its DispatcherServlet.
+
+DispatcherServlet acts as a main controller to route requests to their intended destination. Model is nothing but the data of our application, and the view 
+is represented by any of the various template engines.
+
+DispatcherServlet is an actual servlet, it inherits from HttpServlet base class. We can configure DispatcherServlet in web.xml file or using annotations.
+
+Handler methods - A method in java class that handles incoming http requests.
+
+@GetMapping("/")
+public List<CustomerDTO> getAllCustomers(){
+    ...
+}
+
+Controller class - The java class that contains these Handler methods is called a controller class.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Spring MVC Using Java Configuration:
+
+To enable Spring MVC support through a Java configuration class, we just add the @EnableWebMvc annotation:
+
+@EnableWebMvc
+@Configuration
+public class WebConfig {
+
+    /// ...
+}
+
+This will set up the basic support we need for an MVC project, such as registering controllers and mappings, type converters, validation support, message 
+converters and exception handling.
+
+If we want to customize this configuration, we need to implement the WebMvcConfigurer interface:
+
+@EnableWebMvc
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+   @Override
+   public void addViewControllers(ViewControllerRegistry registry) {
+      registry.addViewController("/").setViewName("index");
+   }
+
+   @Bean
+   public ViewResolver viewResolver() {
+      InternalResourceViewResolver bean = new InternalResourceViewResolver();
+
+      bean.setViewClass(JstlView.class);
+      bean.setPrefix("/WEB-INF/view/");
+      bean.setSuffix(".jsp");
+
+      return bean;
+   }
+}
+
+In this example, we’ve registered a ViewResolver bean that will return .jsp views from the /WEB-INF/view directory.
+We can register view controllers that create a direct mapping between the URL and view name using ViewControllerRegistry.
+For versions earlier than Spring 5, we have to use the WebMvcConfigurerAdapter class instead of the WebMvcConfigurer interface.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Controller and Views:
+
+An example of a basic controller:
+
+@Controller
+public class SampleController {
+    @GetMapping("/sample")
+    public String showForm() {
+        return "sample";
+    }
+
+}
+
+And the corresponding JSP resource is the sample.jsp file:
+<html>
+   <head></head>
+
+   <body>
+      <h1>This is the body of the sample view</h1>	
+   </body>
+</html>
+
+The JSP-based view files are located under the /WEB-INF folder of the project, so they’re only accessible to the Spring infrastructure and not by direct 
+URL access.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+COMPONENTS OF SPRING MVC:
+
+1. DispatcherServlet:
+It is resposible for processing the requests and response. It acts as a front controller that means all the requests first pass through this controller
+and then to the individual controller class that handles the mapping of that request from the URL
+
+2. Handler mapping:
+It is resposible for identifying which controller to pass the request from DispatcherServlet and to process the request. And it will send the controller 
+details to DispatcherServlet.
+
+3. Controller: Processes the request and sends model and view to DispatcherServlet.
+
+4. ViewResolver: Used to resolve the location of a view
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Arcchitecture of Spring MVC:
+
+When we run a spring(or spring boot) app, Spring Boot launches an embedded Tomcat web server for us, listening on port 8080 by default:
+
+    2023-09-10T19:07:52.604  INFO 8712 --- [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+
+Tomcat web server creates Acceptor & Worker threads to handle HTTP requests. Acceptor threads receive incoming requests and place them in a queue. When the queue
+is full, it will reject an additional requests. Worker threads retrieve requests from acceptor queue and handle each request within their dedicated thread stack.
+We can configure the acceptor, max threads, max connections etc in the application.properties file.
+
+    server.tomcat.accept-count=100   // Maximum queue length for incoming connection requests when all possible request processing threads are in use.
+    server.tomcat.max-connections=10000   // Maximum number of connections that the server accepts and processes at any given time.
+    server.tomcat.max-threads=200    // Maximum amount of worker threads.
+    server.tomcat.min-spare-threads=10    // Minimum amount of worker threads.
+
+Additionally, we employ Non-Blocking IO (NIO) threads. This means that a single thread can manage multiple connections and maintain them for a duration determined by 
+the "keepAlive" parameter.
+
+Our Tomcat servlet container server creates "DispatcherServlet" which is a standard servlet that extends HttpServlet class. when a DispatcherServlet is defined in the 
+configuration, the Apache Tomcat container initializes this servlet and delegates our request to it, utilizing one of its worker threads. Whenever spring receives a 
+request, it calls its "doService()" method. The DispatcherServlet class contains a field "handlerMappings" which stores a collection of classes that implement the 
+HandlerMapping interface.
+
+Whenever we define a new @Controller class with method-level @RequestMapping annotations, Spring automatically generates a "RequestMappingInfo" class. This generated 
+information is then incorporated into the "handlerMappings" field. Then DispatcherServlet uses "handlerMappings" list to route the request precisely to a controller
+
+    for (HandlerMapping mapping : this.handlerMappings) {
+        HandlerExecutionChain handler = mapping.getHandler(request);
+        if (handler != null) 
+            return handler;
+    }
+
+The DispatcherServlet sits in the center of all the components. It is the heart of the Spring MVC that receives the request from the client and then sends
+back the response to client after processing the request.
+
+After receiving a request, the handler mapping identifies the cotroller responsible to handle the request and it will send the details of the controller
+to DispatcherServlet.
+
+Controller is responsible to process the incoming request and it will create a model and view and then send it back to DispatcherServlet.
+
+Based on the data from controller, the view resolver finds the corresponding view file and it will send the view and extension back to DispatcherServlet.
+
+DispatcherServlet gives a model and view to View Engine. View Engine will merge the view template with model data and generates an html and sends it
+back to DispatcherServlet. 
+
+DispatcherServlet sends the generated html file back to client.
+
+With Spring Boot, we can set up front end using Thymeleaf or JSP’s without using ViewResolver. By adding spring-boot-starter-thymeleaf  dependency to our 
+pom.xml, Thymeleaf gets enabled, and no extra configuration is necessary.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+@Controller and @RestController Annotations:
+
+Spring 4.0 introduced the @RestController annotation in order to simplify the creation of RESTful web services. It’s a convenient annotation that combines 
+@Controller and @ResponseBody, which eliminates the need to annotate every request handling method of the controller class with the @ResponseBody annotation.
+
+@Controller annotation is simply a specialization @Component annotation which allows auto detection of implemenation classes through classpath scanning.
+
+@Controller
+@RequestMapping("books")
+public class SimpleBookController {
+
+    @GetMapping("/{id}", produces = "application/json")
+    public @ResponseBody Book getBook(@PathVariable int id) {
+        return findBookById(id);
+    }
+}
+
+@ResponseBody annotation enables automatic serialization of the return object into the HttpResponse. It will convert the "Book" object into JSON.
+
+@RestController
+@RequestMapping("books-rest")
+public class SimpleBookRestController {
+    
+    @GetMapping("/{id}", produces = "application/json")
+    public Book getBook(@PathVariable int id) {         --> NO @ResponseBody annotation. Bcoz of @RestController
+        return findBookById(id);
+    }
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+RequestMapping:
+
+@RequestMapping(value = "/ex/foos", 
+headers = { "key1=val1", "key2=val2" }, method = RequestMethod.GET)
+@ResponseBody
+public String getFoosBySimplePath() {
+    return "Get some Foos";
+}
+
+To test this: curl -i http://localhost:8080/ex/foos
+
+value = "/ex/foos" --> URL Path, headers = { "key1=val1", "key2=val2" } --> headers, method = RequestMethod.GET --> HTTP method 
+
+The HTTP method parameter has no default. So, if we don’t specify a value, it’s going to map to any HTTP request.
+
+We can define the "Accept" header too:
+
+@RequestMapping(
+  value = "/ex/foos", 
+  method = GET, 
+  headers = "Accept=application/json")
+@ResponseBody
+public String getFoosAsJsonFromBrowser() {
+    return "Get some Foos with Header Old";
+}
+
+Starting with Spring 3.1, the @RequestMapping annotation now has the produces and consumes attributes, specifically for this purpose:
+
+@RequestMapping(
+  value = "/ex/foos", 
+  method = RequestMethod.GET, 
+  produces = { "application/json", "application/xml" }    --> "produces" attribute produces the return type of the method as mentioned
+)
+@ResponseBody
+public String getFoosAsJsonFromREST() {
+    return "Get some Foos with Header New";
+}
+
+The old type of mapping with the headers attribute will automatically be converted to the new produces mechanism starting with Spring 3.1
+You cant use the old and new ways of specifyig headers together as they are same mapping.
+
+When specified at the type level, the method-level annotations do not complement but override the type-level information.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+@PathVariable:
+
+Parts of the mapping URI can be bound to variables via the @PathVariable annotation.
+
+@RequestMapping(value = "/ex/foos/{id}", method = GET)
+@ResponseBody
+public String method(
+  @PathVariable("id") long id) {
+    return "Get a specific Foo with id=" + id;    --> the id will be equal to the value in @PathVariable annotation
+}
+
+The value in @PathVariable should be equal to the "{ }" in the path of @RequestMapping annotation
+
+If the method param == @PathVariable value, then we can drop the value:
+
+@RequestMapping(value = "/ex/foos/{id}", method = GET)
+@ResponseBody
+public String method(
+  @PathVariable String id) {           -->  method param = id, @PathVariable value  = id.
+    return "Get a specific Foo with id=" + id;
+}
+
+We can also do type conversion this way. 
+@PathVariable long id  --> String id can be converted into long/Integer id.
+
+We can use multiple path variables:
+
+@RequestMapping(value = "/ex/foos/{fooid}/bar/{barid}", method = GET)
+@ResponseBody
+public String getFoosBySimplePathWithPathVariables
+  (@PathVariable long fooid, @PathVariable long barid) {
+    return "Get a specific Bar with id=" + barid + 
+      " from a Foo with id=" + fooid;
+}
+
+@PathVariable with Regex:
+
+@RequestMapping(value = "/ex/bars/{numericId:[\\d]+}", method = GET)
+@ResponseBody
+public String getBarsBySimplePathWithPathVariable(
+  @PathVariable long numericId) {
+    return "Get a specific Bar with id=" + numericId;
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+@RequestParam
+
+@RequestMapping allows easy mapping of query parameters with the @RequestParam annotation.
+We can use @RequestParam to extract query parameters, form parameters, and even files from the request.
+
+We are mapping to the URL: http://localhost:8080/ex/bars?id=100
+
+@RequestMapping(value = "/ex/bars", method = GET)
+@ResponseBody
+public String getBarBySimplePathWithRequestParam(
+  @RequestParam("id") long id) {                         // @RequestParam(name  = "id")
+    return "Get a specific Bar with id=" + id;
+}
+
+Multiple params values can be set, and not all of them have to be used:
+
+@RequestMapping(
+  value = "/ex/bars", 
+  params = { "id", "second" }, 
+  method = GET)
+@ResponseBody
+public String getBarBySimplePathWithExplicitRequestParams(
+  @RequestParam("id") long id) {
+    return "Narrow Get a specific Bar with id=" + id;
+}
+
+Multiple parameters without defining their names or count by just using a Map:
+
+http://localhost:8080/spring-mvc-basics/api/foos?name=abc&id=123
+
+@PostMapping("/api/foos")
+@ResponseBody
+public String updateFoos(@RequestParam Map<String,String> allParams) {
+    return "Parameters are " + allParams.entrySet();
+}
+
+OP: Parameters are {[name=abc], [id=123]}
+
+Mapping a multi value param:
+
+http://localhost:8080/spring-mvc-basics/api/foos?id=1,2,3
+
+@GetMapping("/api/foos")
+@ResponseBody
+public String getFoos(@RequestParam List<String> id) {
+    return "IDs are " + id;
+}
+
+OP: IDs are [1,2,3]
+
+Although a single @RequestMapping path value is usually used for a single controller method (just good practice, not a hard and fast rule), there are some 
+cases where mapping multiple requests to the same method may be necessary.
+We can also add multiple HTTP requests for a same controller method
+
+@RequestMapping(
+  value = { "/ex/advanced/bars", "/ex/advanced/foos" }, 
+  method = { RequestMethod.PUT, RequestMethod.POST })
+@ResponseBody
+public String getFoosOrBarsByPath() {
+    return "Advanced - Get some Foos or Bars";
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Optional Request Parameters:
+Method param annotated with @RequestParam are required by default. If no param is present, we will get an error.
+
+For Optional @RequestParam, put required attribute to false
+@GetMapping("/api/foos") 
+@ResponseBody
+public String getFoos(@RequestParam(required = false) String id) { 
+    return "ID: " + id;
+}
+
+Using Java 8 Optional:
+
+@GetMapping("/api/foos")
+@ResponseBody
+public String getFoos(@RequestParam Optional<String> id){
+    return "ID: " + id.orElseGet(() -> "not provided");
+}
+
+If query param "id" is not specified, above getFoos() method will return "ID: not provided"
+
+Default Value for the Request Parameter:
+
+@GetMapping("/api/foos")
+@ResponseBody
+public String getFoos(@RequestParam(defaultValue = "test") String id) {
+    return "ID: " + id;
+}
+
+If no param is supplied, returns "ID: test" 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+A Fallback for All Requests:
+
+@RequestMapping(
+  value = "*", 
+  method = { RequestMethod.GET, RequestMethod.POST ... })
+@ResponseBody
+public String allFallback() {
+    return "Fallback for All Requests";
+}
+
+If you give same HTTP method, URL path in value, parameters, headers and media type to more then 1 controller method, then it will throw 
+"java.lang.IllegalStateException: Ambiguous mapping" error
+
+Spring Framework 4.3 introduced a few new HTTP mapping annotations, all based on @RequestMapping:
+    @GetMapping
+    @PostMapping
+    @PutMapping
+    @DeleteMapping
+    @PatchMapping
+
+These new annotations can improve the readability and reduce the verbosity of the code. 
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+A DTO, or Data Transfer Object, is a Java object that is used to encapsulate data and transfer it between different layers or systems. DTOs typically contain a subset 
+of the fields of a domain object, and they are designed to be lightweight and efficient for transfer over the network or between different parts of an application. By 
+using DTOs, developers can separate the concerns of the domain model from those of the data transfer, making their code more modular and easier to maintain.
+
+Mapping frameworks:
+
+1. MapStruct
+Add the dependency and plugin to pom.xml
+
+@Mapper(componentModel = "spring")    // if we want to inject it as a Bean, then add the parameter componentModel = "spring”
+public interface UserMapper {
+
+    UserDto toDto(User user);           // Create a UserDto class with necessary fields
+
+    User toEntity(UserDto dto);
+}
+
+If the fields of entity class and DTO class dont match, we can define that in @Mapper annotation.
+
+@Mapping(target = "nombre", source = "name")     // nombre field in DTO = name field in entity class
+  UserDto toDto(User user); 
+
+@Transactional(readOnly = true)                  // In our service class
+public UserDto getUser(Long id) {
+    return userMapper.toDto(userRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("User not found")));
+}
+
+2. ModelMapper
+
+Add the dependency to pom.xml and create a Bean for Mapper
+
+@Configuration
+public class Mapper {                 // We have to create a bean explicitly coz modelMapper belongs to 3rd party library
+    @Bean
+    public ModelMapper modelMapper() {
+        return new ModelMapper();
+    }
+}
+
+@Service
+public class UserService {
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private ModelMapper mapper;
+
+    @Transactional(readOnly = true)
+    public UserDto getUser(Long id) {
+        User u = userRepository.findById(id)
+                               .orElseThrow(() -> new EntityNotFoundException("User doesnt exist"))
+        return mapper.map(u, UserDto.class);    // converting "User" domain object to "UserDto" object
+    }
+}
+
+If we want to customize the mapping of a field in DTO class:
+
+    mapper.getTypeMap(User.class,UserDto.class).addMapping(User::getName,UserDto::setNombre);
+
+3. JMapper:
+
+It is same as ModelMapper except we have to add "@JMap" annotation above all the fields in DTO class. If we want to map a field of DTO to another field in entity
+class, ex: map the "name" field in DTO with "nombre" field in entity then
+
+@JMap("nombre")          // nombre -> Entity class
+private String name;     // name   -> DTO class
+
+5. @SqlResultSetMapping - Its functionality is to map result sets from database SQL statements into Java objects. See in Hibernate funda file
+
+5. RowMapper(Non - JPA mapping):
+
+An interface used by JdbcTemplate for mapping rows of a ResultSet on a per-row basis. Implementations of this interface perform the actual work of mapping each 
+row to a result object but don't need to worry about exception handling. SQLExceptions will be caught and handled by the calling JdbcTemplate. This is used with 
+spring JdbcTemplate & not with an ORM like hibernate.
+
+This is a functional interface which contains single void method - "mapRow(ResultSet rs, int rowNum) throws SQLException"
+
+public List<Student> getAllStudentDetails() {
+         
+    return jdbcTemplate.query("SELECT * FROM student", new RowMapper<Student>() {   // we can create a separate class such as studentRowMapper 
+                                                                                    // that implements RowMapper<Student> interface
+        public Student mapRow(ResultSet rs, int rowNum) throws SQLException {
+            Student student = new Student();
+
+            student.setId(rs.getInt(1));
+            student.setName(rs.getString(2));
+            student.setDepartment(rs.getString(3));
+            return student;
+        }
+    });
+}
+
+OR
+
+We can implement a "ResultSetExtractor" interface an pass the ResultSetExtractor object to the mapRow() method.
+
+public class PersonResultSetExtractor implements ResultSetExtractor {
+    @Override
+    public Object extractData(ResultSet rs) throws SQLException {
+        Person person = new Person();
+        person.setFirstName(rs.getString(1));
+        person.setLastName(rs.getString(2));
+        return person;
+    }
+}
+
+public class PersonRowMapper implements RowMapper {
+    @Override
+    public Object mapRow(ResultSet rs, int line) throws SQLException {
+        PersonResultSetExtractor extractor = new PersonResultSetExtractor();
+        return extractor.extractData(rs);
+    }
+}

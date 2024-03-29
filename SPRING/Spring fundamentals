@@ -1,0 +1,431 @@
+* BEAN SCOPES:
+Beans are fundamental components in Spring framework that are managed by the Spring container. They represent objects that are created, configured, and managed by 
+the Spring framework to provide various functionalities in a Spring application.
+
+Scopes for Spring beans are:
+
+1. Singleton -->
+When a bean has a singleton scope, it means that only a single instance of the bean is created per Spring application context. This instance is stored in memory and 
+reused each time the bean is requested in the future, rather than creating a new instance for each request. This is the DEFAULT scope if no scope is defined
+
+@Component
+@Scope("singleton")
+public class SingletonBean {  
+}
+
+- Single instance: Only one instance per app lifecycle, same instance is returned if requested.
+
+- Stored in memory: which means it is available for whole lifetime of the app 
+
+- Shared: Same instance is shared between different components
+
+- Efficiency: by avoiding the overhead of creating multiple instances of the same bean for each request.
+
+2. Prototype   -->
+A new instance of the bean is created each time it is requested.
+
+@Scope("prototype")
+
+- New instance on each request: Each time a bean with “prototype” scope is requested, a new instance of the bean is created.
+
+- No state sharing: Each instance has its own independent state and any modification to one bean instance will not affect other instances.
+
+- Unmanaged lifecycle: Beans are not managed completely by the Spring container. Spring does not take care of destroying prototype bean instances when they are no 
+longer in use. It is the responsibility of the developer to manage the lifetime of prototype bean instances and release resources appropriately.
+To get the container to release resources held by prototype-scoped beans, try using a custom bean "post-processor", which holds a reference to beans that need to be 
+cleaned up.
+
+- Greater configuration flexibility: allows multiple instances of the same bean to be created with different configurations at runtime.
+
+- Higher resource consumption: Because a new instance of the bean is created for each request, the use of such beans may result in higher resource consumption.
+
+- Suitable for objects with changing state: there is no need to share state between different instances.
+
+3. Request     -->
+A new instance of the bean is created for each HTTP request that arrives at the server. This instance of the bean will be available for the duration of the processing 
+of that specific request, and will be destroyed at the end of the request. They cannot be accessed from other requests or outside the context of the current request.
+
+@RequestScope
+
+- One instance per request: This allows to have a specific state for each request and avoid sharing information between different requests.
+
+- In-request state sharing: Beans with request scope share their state within the context of the request in which they were created. All components or classes accessing 
+the same bean in the same request will see the same state of the bean.
+
+- Suitable for request-specific data: suitable for beans that contain HTTP request-specific data, such as user info, request params, or request-specific session data.
+
+- Useful in web applications: when you want to share the same bean between different components within the same request lifecycle.
+
+4. Session    -->
+A single instance of the bean is created for each HTTP session that is established in the application. This instance of the bean will be available for the duration 
+of the user’s session, and will be destroyed at the end of the session.
+
+@SessionScope
+
+- If a user logs out or the session expires, the bean instance is automatically destroyed. This allows for automated management of bean instances based on the 
+lifecycle of the user’s session.
+
+- The session scope is available only in Spring MVC-based web applications, as it refers to the management of instances in the context of an HTTP session.
+
+- Beans are shared within the context of same session by all components/classes.
+
+5. Application     -->
+Beans whose instances are intended to be shared globally throughout the application, meaning that they can be accessed from anywhere in the application at any time.
+
+@ApplicationScope
+
+- A bean instance is created at the start of the application and is maintained for the lifetime of the application. This means that there will only be a single 
+instance of the bean in the entire application, and all parts of the application will access the same instance.
+
+- Global scope: This allows sharing global data or functionality in the application, such as configurations, utilities, cache objects, and so on.
+
+Singleton vs Application Scope
+
+Beans annotated with @ApplicationScope are bounded to the ServletContext. Singleton scoped beans are bounded to the ApplicationContext.
+
+A "ServletContext" is shared between all servlets living in the same servlet container (ex Tomcat). This is a Java EE class(it belongs to the pckg javax.servlet).
+An "ApplicationContext" represents a Spring IoC container, so it is a Spring-specific class(it belongs to the pckg org.springframework.context). 
+
+You can have multiple IoC container in the same servlet container, so you can have multiple singleton beans of the same type but only one application scoped bean 
+of each type.
+
+6. WebSocket   -->
+The WebSocket Scope type is a special type in which the bean that is created lasts for the duration of the WebSocket session.
+This type of Scope will live as long as the WebSocket session is alive. We can also say that it exhibits singleton behavior, but limited to a WebSocket session only.
+
+@Component
+@Scope(scopeName = "websocket", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class WebSocketBean{
+}
+
+The request, session, application, and websocket scopes are available only if you use a Web-Aware Spring ApplicationContext implementation 
+(such as XmlWebApplicationContext). If you use these scopes with regular Spring IoC containers, such as the ClassPathXmlApplicationContext, an 
+IllegalStateException that complains about an unknown bean scope is thrown.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+@Conditional:
+This annotation allows for conditional bean registration based on certain conditions at runtime. This feature becomes incredibly useful when dealing with different environments, feature flags, or when trying to create highly modular and reusable code.
+
+This annotation can be used on method, class & component level. This annotation takes a class which contains some conditional logic & implements "Condition" interface.
+When Spring evaluates this logic, it decides whether to register the annotated bean or not.
+
+    public class SomeCondition implements Condition {
+    
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            // Your custom logic to evaluate the condition
+            return true; // or false, depending on the condition
+        }
+    }
+
+Use Cases for Conditional Bean Registration:
+
+1. Environment-specific Beans:
+We can register bean in th context based on the enviroment(dev, test, prod). For ex, you may want to use a mock service for local dev and the actual service for prod
+
+    @Configuration
+    public class ServiceConfig {
+
+        @Bean
+        @Conditional(DevelopmentCondition.class)
+        public MyService mockService() {
+            return new MockMyServiceImpl();
+        }
+
+        @Bean
+        @Conditional(ProductionCondition.class)
+        public MyService realService() {
+            return new RealMyServiceImpl();
+        }
+    }
+
+2. Feature Flags:
+Feature flags or feature toggles are a powerful technique for altering an application’s behavior without changing its code. They allow you to enable or disable features dynamically, which can be particularly useful during A/B testing, gradual feature rollouts, or emergency rollbacks.
+Imagine having an email notification system that is under testing and you want to enable or disable it using a feature flag:
+
+    @Bean
+    @Conditional(EmailNotificationEnabledCondition.class)
+    public NotificationService emailNotificationService() {
+        return new EmailNotificationServiceImpl();
+    }
+
+3. Modular Architecture:
+In a monolithic application that’s modular, you might want to enable or disable entire modules or services based on the deployment configuration or even at runtime.
+For instance, if you have a payment module that should only be active when certain conditions are met, you could do something like this:
+
+    @Configuration
+    @Conditional(PaymentModuleEnabledCondition.class)
+    public class PaymentConfig {
+        // Define your payment-related beans here
+    }
+
+4. Resource Availability:
+Sometimes you may want to conditionally register a bean based on the availability of a certain resource like a file, a database, or an environment variable. This is useful for fallback mechanisms.
+
+5. Conditional API Endpoints:
+In some advanced scenarios, you may even want to conditionally expose or hide certain REST API endpoints based on user roles, subscription levels, or some other business logic. This can be achieved through conditional bean registration of controllers.
+
+The Condition Interface:
+The Condition interface is the cornerstone of the @Conditional annotation. It consists of a single method:
+
+    public interface Condition {
+        boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata);
+    }
+
+ConditionContext: Provides context information during the evaluation, including details about the bean factory, environment, and class loader.
+AnnotatedTypeMetadata: Offers metadata of the annotated element, which can be a class, method, or field.
+
+    public class MySimpleCondition implements Condition {
+    
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            String enabled = System.getProperty("enableMyBean");
+            return "true".equalsIgnoreCase(enabled);
+        }
+    }
+
+You can also combine multiple conditions to form more complex logical structures.
+
+    @Bean
+    @Conditional({DatabaseAvailableCondition.class, EmailServiceEnabledCondition.class})
+    public MyService myService() {
+        return new MyServiceImpl();
+    }
+
+MyService will only be registered if both DatabaseAvailableCondition and EmailServiceEnabledCondition evaluate to true.
+
+While less common, Spring also offers a way to evaluate conditions programmatically using the ConditionEvaluator interface. This is useful for very dynamic scenarios where conditions might be too complex for the @Conditional annotation alone.
+
+Condition Evaluation:
+1. Parsing Configuration: During this phase, Spring identifies all beans that are candidates for creation and examines any associated conditions.
+
+2. Condition Evaluation: The matches method of each condition class is invoked. This method contains the logic that determines whether the condition is met.
+
+3. Bean Registration: If all conditions for a bean are met, it gets registered. Otherwise, it is skipped.
+
+4. Dependency Resolution: Once all conditions are processed, Spring resolves dependencies and injects them where needed.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+Common pitfalls:
+1. Neglecting the Bean Overriding Feature:
+If there are beans of same type with @Conditional annotation which takes different condition classes & if both are true, then the latter bean will override the former.
+
+    @Bean
+    @Conditional(OnDevelopmentCondition.class)   // different condition classes
+    public MyService devMyService() {     // same type
+        return new DevMyService();
+    }
+
+    @Bean
+    @Conditional(OnProductionCondition.class)
+    public MyService prodMyService() {        // This bean will override the above one if OnDevelopmentCondition.class & OnProductionCondition = true
+        return new ProdMyService();
+    }
+
+2. Circular dependencies:
+Creating beans that depend on each other. Spring may not be able to resolve such dependencies correctly, causing the application to fail at startup.
+
+    @Bean
+    @Conditional(ConditionA.class)
+    public ServiceA serviceA(ServiceB serviceB) {
+        return new ServiceA(serviceB);
+    }
+
+    @Bean
+    @Conditional(ConditionB.class)
+    public ServiceB serviceB(ServiceA serviceA) {
+        return new ServiceB(serviceA);
+    }
+
+3. Confusing @ConditionalOnBean and @Conditional
+While @ConditionalOnBean might appear similar to @Conditional, they operate at different phases of the application context lifecycle. @ConditionalOnBean checks conditions during bean creation, whereas @Conditional evaluates conditions before the bean definition is registered.
+
+4. Condition Caching:
+Spring caches the result of condition evaluations for performance reasons. This means if your condition has side-effects or relies on mutable state, you might see inconsistent behavior.
+
+5. Be cautious when your condition depends on external states like databases or remote services. Such dependencies can make the startup process fragile and slow.
+
+6. Using @Conditional on @Component:
+While you can use @Conditional on component classes (@Component, @Service, etc.), doing so might make it hard to predict the behavior, especially when component scanning is involved. It is often better to restrict the use of @Conditional to @Bean methods within @Configuration classes for greater control and clarity.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Spring bean life cycle:
+
+1. Spring container looks for the definition of the bean in the spring configuration class/xml file
+
+2. Spring instantiate the bean by calling no argument default constructor of that class. If there is only parameterized constructor in the class , then bean must be defined in spring xml file with constructor injection using which container will instantiate the bean otherwise it will throw bean creation exception.
+
+3. Spring injects the values and references(if any) into bean’s properties.
+
+4. If the bean implements BeanNameAware interface, Spring passes the bean’s ID to the setBeanName() method and executes this method.
+
+5. If the bean implements BeanFactoryAware interface, Spring calls the setBeanFactory() method, passing in the bean factory itself and executes this method.
+
+6. If the bean implements ApplicationContextAware interface, Spring will call the setApplicationContext() method, passing in a reference to the current application context and executes this method.
+
+7. If the bean implements the BeanPostProcessor interface, Spring calls their postProcessBeforeInitialization() method
+
+8. If the bean implements the InitializingBean interface, Spring calls afterPropertiesSet() method after all the properties of that bean are set.
+Similarly, if the bean is declared with an init-method, then the specified initialization method will be called.
+
+9. If the bean implements BeanPostProcessor, Spring will call their postProcessAfterInitialization() method.
+
+10. At this point, the bean is ready to be used by the application and will remain in the application context until the application context is destroyed.
+
+11. If the bean implements the DisposableBean interface, then Spring will call the destroy() method. Likewise, if any bean was declared with a destroy-method, then the specified method will be called.
+
+Bean Lifecycle Callback Methods:
+To execute some custom code, the bean factory allows to execute the callback methods, which can be categorized broadly into two groups:
+
+    - Post-initialization callback methods
+    - Pre-destruction callback methods
+
+Post-Initialization Callbacks:
+Most often, but not limited to, the initialization callbacks are used to perform the dependency checks that are not possible in the constructor. There may be other usecases such as if a bean is scheduled to run tasks then the initialization callback is the ideal place to start the scheduler.
+The post-initialization callback method cannot accept any arguments. Although, it can return any type which Spring will ignore anyways.
+
+We can even define all initialization mechanisms on the same bean instance. It is allowed in Spring. In this case, Spring invokes the callbacks in the following order:
+
+    - Method annotated with @PostConstruct
+    - Method InitializingBean.afterPropertiesSet()
+    - Method specified in the @Bean definition (@Bean(initMethod = "init", destroyMethod = "destroy"))
+        // init() & destroy() methods are defined in the class which is annotated by @Bean(initMeth...)
+
+Pre-destruction Callbacks:
+When the application shuts down, Spring calls the ConfigurableBeanFactory.destroySingletons() method which provides us a chance to clean up any resources that the beans might be holding open, thus allowing the application to shut down gracefully. When the destroySingletons() is called, the beans get the notifications via pre-destruction callback methods 
+
+The destruction callback is often used in conjunction with the initialization callback. In many cases, we create and configure a resource in the initialization callback and then release the resource in the destruction callback.
+
+Notice the method name destroySingletons(). It hints that beans with other scopes than singleton do not have their life cycle fully managed by Spring.
+
+As with the case of bean creation, the order of method invocations in case of multiple bean destruction callbacks is:
+
+    - Method annotated with @PreDestroy
+    - Method DisposableBean.destroy()
+    - Method specified in the @Bean definition (destroy())
+
+Different Ways to add the Bean Lifecycle Callbacks
+
+Spring framework provides the following ways for controlling the lifecycle events of a bean. These are broadly categorized into three categories:
+
+1. Interface-based Lifecycle Management can be achieved by implementing
+        - InitializingBean and DisposableBean interfaces
+        - *Aware interfaces for specific behavior
+2. Method-based Lifecycle Management is achieved by adding custom init() and destroy() methods in the bean class and declaring them in the bean configuration file.
+3. Annotation-based Lifecycle Management is achieved by adding JSR-250 @PostConstruct and @PreDestroy annotated methods in the bean class.
+
+Implementing the InitializingBean and DisposableBean Interfaces:
+
+The InitializingBean interface specifies a single method afterPropertiesSet() which Spring automatically calls after the bean’s properties have been set.
+
+    public class Creatingbean implements InitializingBean{
+
+        @Override
+        public void afterPropertiesSet() throws Exception{
+            // Bean is initialized
+        }
+    }
+
+Similarly, implementing the org.springframework.beans.factory.DisposableBean interface allows a bean to get a callback during bean destruction, such as when the application context is closed.
+The DisposableBean interface specifies a single method destroy() which Spring automatically calls automatically.
+
+public class MyBean implements DisposableBean {
+
+    @Override
+    public void destroy() {
+        // Custom destruction logic
+    }
+}
+
+Aware Interfaces to Add Specific Behavior:
+Spring offers a range of interfaces that allow the beans to indicate to the container that they require a particular infrastructure dependency. Each of these Aware interfaces will require us to implement a method to inject the dependency in the bean.
+
+public class DemoBean implements BeanNameAware, BeanFactoryAware, ApplicationContextAware, ResourceLoaderAware {
+	private ApplicationContext ctx;
+    private String name;
+    private ResourceLoader resourceLoader;
+    private BeanFactory beanFactory;
+
+	@Override
+	public void setApplicationContext(ApplicationContext ctx) throws BeansException {  // ApplicationContextAware
+		this.ctx = ctx;
+	}
+
+    @Override
+	public void setBeanFactoryAware(BeanFactory beanFactory) throws BeansException {  // BeanFactoryAware
+		this.beanFactory = beanFactory;
+	}
+
+	@Override
+	public void setBeanName(String name) throws BeansException {  // BeanNameAware
+		this.name = name;
+	}
+
+    @Override
+	public void setResourceLoader(ResourceLoader resourceLoader) throws BeansException {  /// ResourceLoaderAware
+		this.resourceLoader = resourceLoader;
+	}
+}
+
+Custom init() and destroy() Methods:
+1. Bean-specific Init and Destroy Methods: The local init() and destroy() methods can be configured to a specific bean 
+    @Configuration
+    public class AppConfig {
+        @Bean(initMethod = "customInit", destroyMethod = "customDestroy")
+        public DemoBean demoBean() {
+            return new DemoBean();
+        }
+    }
+
+    public class DemoBean {
+        
+        public void customInit() {
+            // Custom initialization logic
+        }
+
+        public void customDestroy() {
+            // Custom destruction logic
+        }
+    }
+
+2. Global-scoped Init and Destroy Methods:
+We can define the init and destroy methods at the global level as well. The container will invoke the global init and destroy methods for all bean definitions using the attributes 'default-init-method' and 'default-destroy-method'. Global overrides are helpful when we have a pattern of defining common method names such as init() and destroy() for all the beans consistently
+
+    public class DemoBean {
+        public void customInit() {
+            System.out.println("Method customInit() invoked...");
+        }
+        public void customDestroy()	{
+            System.out.println("Method customDestroy() invoked...");
+        }
+    }
+
+@PostConstruct and @PreDestroy Annotations: From Spring 2.5, we can use the these annotations for specifying the bean life cycle methods.
+
+@PostConstruct annotated method will be invoked after the bean has been constructed using the default constructor and just before its instance is returned to the requesting object.
+
+@PreDestroy annotated method is invoked just before the bean is about to be destroyed inside the bean container.
+
+    public class DemoBean {
+        @PostConstruct
+        public void customInit(){
+            System.out.println("Method customInit() invoked...");
+        }
+
+        @PreDestroy
+        public void customDestroy(){
+            System.out.println("Method customDestroy() invoked...");
+        }
+    }
+
+Registering a Shutdown Hook is Necessary:
+When we run the demo programs listed above, we expect the program to print the messages written in post-init and pre-destroy callback methods.
+But only customInit() method is called. This is because that to call the pre-destroy, we must call the applicationContext.close() method before the application is closed. But when an application can be closed/stopped/killed in several ways then it becomes harder to place the above statement.
+
+Java allows to register a shutdown hook which is a thread that is executed just before the application shuts down. We must invoke the AbstractApplicationContext’s registerShutdownHook() method anytime before the application is stopped.
+
+    var applicationContext = new AnnotationConfigApplicationContext(Config.class);
+    applicationContext.registerShutdownHook();

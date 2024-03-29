@@ -1,0 +1,426 @@
+JUNIT PLATFORM:
+
+The platform is responsible for launching testing frameworks on the JVM. It defines a stable and powerful interface between JUnit and its clients, such as build tools.
+The platform easily integrates clients with JUnit to discover and execute tests.
+
+It also defines the TestEngine API for developing a testing framework that runs on the JUnit platform. By implementing a custom TestEngine, we can plug 3rd party 
+testing libraries directly into JUnit.
+
+NOTE: While adding dependency of junit in pom.xml file, add scope as test(<scope>test</scope>) so that maven doesnt include it in final build.
+
+ANNOTATIONS IN JNUIT:
+
+- @TestFactory – denotes a method that’s a test factory for dynamic tests
+
+- @Nested – denotes that the annotated class is a nested, non-static test class
+
+- @Tag – declares tags for filtering tests
+
+- @ExtendWith – registers custom extensions
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+BASIC ANNOTATIONS:
+
+1. @BeforeAll   (was @BeforeClass in JUnit 4)
+static void setup() {
+    log.info("@BeforeAll - executes once before all test methods in this class");
+}
+
+@BeforeEach    (was @Before in JUnit 4)
+void init() {
+    log.info("@BeforeEach - executes before each test method in this class");
+}
+
+Method with the @BeforeAll annotation needs to be static, otherwise the code won’t compile.
+
+2. @DisplayName and @Disabled
+@DisplayName("Single test successful")
+@Test
+void testSingleSuccessTest() {       --> test name is "Single test successful" is passed
+    log.info("Success");
+}
+
+@Test
+@Disabled("Not implemented yet")      --> Test disabled for this method
+void testShowSomething() {
+}
+
+3. @AfterEach and @AfterAll
+@AfterEach       (was @After in JUnit 4)
+void tearDown() {
+    log.info("@AfterEach - executed after each test method.");
+}
+
+@AfterAll       (was @AfterClass in JUnit 4)
+static void done() {
+    log.info("@AfterAll - executed after all test methods.");
+}
+
+Method with @AfterAll & @BeforeAll needs to be a static method.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+ASSERTIONS:
+Assertions are utility methods to support asserting conditions in tests. 
+
+1. assertEquals(): The assertEquals assertion verifies that the expected and actual values are equal:
+
+@Test
+public void whenAssertingEquality_thenEqual() {
+    String expected = "Baeldung";
+    String actual = "Baeldung";
+
+    assertEquals("failure - strings are not equal", expected, actual);    // specify a message when the assertion fails, this is optional
+}
+
+If we want to assert that the actual value differs by a predefined delta from the expected value, we can pass the delta as the 3rd param to assertEquals():
+
+@Test
+void whenAssertingEqualityWithDelta_thenEqual() {
+    float square = 2 * 2;       // 4
+    float rectangle = 3 * 2;    // 6
+    float delta = 2;            //  (6 - 4 = 2)
+
+    assertEquals(square, rectangle, delta);
+}
+
+2. assertArrayEquals(): If we want to assert that two arrays are equals
+
+@Test
+public void whenAssertingArraysEquality_thenEqual() {
+    char[] expected = {'J','u','n','i','t'};
+    char[] actual = "Junit".toCharArray();
+    
+    assertArrayEquals(expected, actual);
+}
+
+If both arrays are null, the assertion will consider them equal.
+
+3. assertNotNull and assertNull: When we want to test if an object is null
+
+@Test
+public void whenAssertingNull_thenTrue() {
+    Object car = null;
+    
+    assertNull("The car should be null", car);
+}
+
+@Test
+void whenAssertingNotNull_thenTrue() {
+    Object car = new Object();
+
+    assertNotNull(car, () -> "The car should not be null");
+}
+
+4. assertNotSame and assertSame: To verify that two variables don’t refer to the same object:
+
+@Test
+public void whenAssertingNotSameObject_thenDifferent() {
+    Object cat = new Object();
+    Object dog = new Object();
+
+    assertNotSame(cat, dog);    // use "assertSame" to verify if two variables refer to same object.
+}
+
+5. assertTrue and assertFalse: If we want to verify that a certain condition is true or false
+
+@Test
+public void whenAssertingConditions_thenVerified() {
+    assertTrue("5 is greater then 4", 5 > 4);
+    assertFalse("5 is not greater then 6", 5 > 6);
+}
+
+We can pass a BooleanSupplier to assertion instead of a boolean condition.
+
+@Test
+public void givenBooleanSupplier_whenAssertingCondition_thenVerified() {
+    BooleanSupplier condition = () -> 5 > 6;
+
+    assertFalse(condition, "5 is not greater then 6");
+}
+
+@Test
+void lambdaExpressions() {
+    List numbers = Arrays.asList(1, 2, 3);
+
+    assertTrue(numbers.stream()
+      .mapToInt(Integer::intValue)
+      .sum() > 5, () -> "Sum should be greater than 5");
+}
+
+One advantage of using the lambda expression for the assertion message is that it’s lazily evaluated, which can save time and resources if the message construction 
+is expensive.
+
+6. fail()
+The fail assertion fails a test throwing an AssertionFailedError. It can be used to verify that an actual exception is thrown, or when we want to make a test 
+fail during its development.
+
+@Test
+public void whenCheckingExceptionMessage_thenEqual() {
+    try {
+        methodThatShouldThrowException();
+        fail("Exception not thrown");
+    } catch (UnsupportedOperationException e) {
+        assertEquals("Operation Not Supported", e.getMessage());
+    }
+}
+
+7. assertThat():
+The assertThat assertion is the only one in JUnit 4 that has a reverse order of parameters compared to the other assertions.
+
+@Test
+public void testAssertThatHasItems() {
+    assertThat(
+      Arrays.asList("Java", "Kotlin", "Scala"), 
+      hasItems("Java", "Kotlin"));
+}
+
+8. assertAll(): 
+This assertion allows the creation of grouped assertions, where all the assertions are executed and their failures are reported together. In detail, this assertion 
+accepts a heading that will be included in the message string for the MultipleFailureError, and a Stream of Executable.
+
+@Test
+void groupAssertions() {
+    int[] numbers = {0, 1, 2, 3, 4};
+    assertAll("numbers",
+        () -> assertEquals(numbers[0], 1),
+        () -> assertEquals(numbers[3], 3),
+        () -> assertEquals(numbers[4], 1),
+        () -> assertArrayEquals(numsbers, new int[]{0,1,2,3,4,5})
+    );
+}
+
+We’ll be able to pinpoint the exact location of any failure.
+
+9. assertIterableEquals(): The assertIterableEquals asserts that the expected and actual iterables are deeply equal.
+In order to be equal, both iterables must return equal elements in the same order, and it isn’t required that the two iterables are of the same type in order to 
+be equal. LinkedList and ArrayList are same in this case. If both iterables are null, they’re considered equal.
+
+@Test
+void givenTwoLists_whenAssertingIterables_thenEquals() {
+    Iterable<String> al = new ArrayList<>(asList("Java", "Junit", "Test"));
+    Iterable<String> ll = new LinkedList<>(asList("Java", "Junit", "Test"));
+
+    assertIterableEquals(al, ll);
+}
+
+10. assertLinesMatch
+The assertLinesMatch asserts that the expected list of String matches the actual list.
+This method differs from the assertEquals and assertIterableEquals because for each pair of expected and actual lines, it performs this algorithm:
+
+- Check if the expected line is equal to the actual one. If yes, it continues with the next pair.
+- Treat the expected line as a regular expression and perform a check with the String.matches() method. If yes, it continues with the next pair.
+- Check if the expected line is a fast-forward marker. If yes, apply fast-forward, and repeat the algorithm from the step 1.
+
+@Test
+void whenAssertingEqualityListOfStrings_thenEqual() {
+    List<String> expected = asList("Java", "\\d+", "JUnit");
+    List<String> actual = asList("Java", "11", "JUnit");
+
+    assertLinesMatch(expected, actual);
+}
+
+11. assertThrows()
+assertThrows assertion allows us a clear and simple way to assert if an executable throws the specified exception type. The assertion will fail if no exception is 
+thrown, or if an exception of a different type is thrown.
+
+@Test
+void whenAssertingException_thenThrown() {
+    Throwable exception = assertThrows(
+      IllegalArgumentException.class, 
+      () -> {
+          throw new IllegalArgumentException("Exception message");
+      }
+    );
+    assertEquals("Exception message", exception.getMessage());
+}
+
+However, with the assertTimeout assertion, the supplied executable will be executed in the same thread of the calling code. Consequently, execution of the supplier 
+won’t be preemptively aborted if the timeout is exceeded.
+If we want to be sure that execution of the executable will be aborted once it exceeds the timeout, we can use the assertTimeoutPreemptively assertion.
+
+Both assertions can accept a ThrowingSupplier, instead of an Executable, representing any generic block of code that returns an object and that can potentially 
+throw a Throwable.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ASSUMPTIONS:
+Assumptions are used to run tests only if certain conditions are met. This is typically used for external conditions that are required for the test to run properly, 
+but which aren’t directly related to whatever is being tested.
+
+We can declare an assumption with assumeTrue(), assumeFalse(), and assumingThat():
+
+@Test
+void trueAssumption() {
+    assumeTrue(5 > 1);
+    assertEquals(5 + 2, 7);
+}
+
+@Test
+void falseAssumption() {
+    assumeFalse(5 < 1);
+    assertEquals(5 + 2, 7);
+}
+
+@Test
+void assumptionThat() {
+    String someString = "Just a string";
+    assumingThat(
+        someString.equals("Just a string"),
+        () -> assertEquals(2 + 2, 4)
+    );
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+EXCEPTION TESTING:
+
+JUnit 5 Jupiter assertions API introduces the "assertThrows" method for asserting exceptions.
+
+This takes the type of the expected exception and an Executable functional interface where we can pass the code under test through a lambda expression:
+
+@Test(expected = NumberFormatException.class)
+public void whenExceptionThrown_thenAssertionSucceeds() {
+    Exception exception = assertThrows(NumberFormatException.class, () -> {
+        Integer.parseInt("1a");
+    });
+
+    String expectedMessage = "For input string";
+    String actualMessage = exception.getMessage();
+
+    assertTrue(actualMessage.contains(expectedMessage));
+}
+
+If the expected exception is thrown, assertThrows returns the exception, which enables us to also assert on the message.
+
+Furthermore, it’s important to note that this assertion is satisfied when the enclosed code throws an exception of type NumberFormatException or any of its derived 
+types. This means that if we pass "Exception" as the expected exception type, any exception thrown will make the assertion succeed since "Exception" is the 
+super-type for all exceptions.
+
+We can simply use the expected attribute of the @Test annotation to declare that we expect an exception to be thrown anywhere in the annotated test method. 
+
+When we need to verify some other properties of the exception, we can use the ExpectedException rule:
+
+@Rule
+public ExpectedException exceptionRule = ExpectedException.none();
+
+@Test
+public void whenExceptionThrown_thenRuleIsApplied() {
+    exceptionRule.expect(NumberFormatException.class);
+    exceptionRule.expectMessage("For input string");
+    Integer.parseInt("1a");
+}
+
+@Test
+void shouldThrowException() {
+    Throwable exception = assertThrows(UnsupportedOperationException.class, () -> {
+      throw new UnsupportedOperationException("Not supported");
+    });
+    assertEquals("Not supported", exception.getMessage());
+}
+
+@Test
+void assertThrowsException() {
+    String str = null;
+    assertThrows(IllegalArgumentException.class, () -> {
+      Integer.valueOf(str);
+    });
+}
+
+The first example verifies the details of the thrown exception, and the second one validates the type of exception.
+
+For non-void return type method testing, we can use when().thenThrow():
+
+    @Test
+    void givenNonVoidReturnType_whenUsingWhenThen_thenExceptionIsThrown() {
+        MyDictionary dictMock = mock(MyDictionary.class);
+
+        when(dictMock.getMeaning(anyString())).thenThrow(NullPointerException.class);   // dictMock.getMeaning() returns a string
+        
+        assertThrows(NullPointerException.class, () -> dictMock.getMeaning("word"));
+    }
+
+If our method returns void, we’ll use doThrow():
+
+    @Test
+    void givenVoidReturnType_whenUsingDoThrow_thenExceptionIsThrown() {
+        MyDictionary dictMock = mock(MyDictionary.class);
+
+        doThrow(IllegalStateException.class).when(dictMock)           // dictMock.add() returns a void type
+            .add(anyString(), anyString());           
+        
+        assertThrows(IllegalStateException.class, () -> dictMock.add("word", "meaning"));
+    }
+
+We can’t use when().thenThrow() with the void return type, as the compiler doesn’t allow void methods inside brackets.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+TEST SUITES:
+
+We can aggregate multiple test classes in a test suite, so that we can run those together. JUnit 5 provides two annotations, @SelectPackages and @SelectClasses, 
+to create test suites.
+
+@Suite
+@SelectPackages("com.baeldung")
+@ExcludePackages("com.baeldung.suites")
+public class AllUnitTest {}
+
+@SelectPackage is used to specify the names of packages to be selected when running a test suite. In our example, it will run all tests.
+
+@Suite
+@SelectClasses({AssertionTest.class, AssumptionTest.class, ExceptionTest.class})
+public class AllUnitTest {}
+
+@SelectClasses, is used to specify the classes to be selected when running a test suite. The above class will create a suite that contains three test classes. 
+Please note that the classes don’t have to be in one single package.
+
+DYNAMIC TESTS:
+
+Dynamic Tests feature allows us to declare and run test cases generated at run-time. Contrary to Static Tests, which define a fixed number of test cases at the 
+compile time, Dynamic Tests allow us to define the test cases dynamically in the runtime.
+
+@TestFactory
+Stream<DynamicTest> translateDynamicTestsFromStream() {
+    return in.stream()
+      .map(word ->
+          DynamicTest.dynamicTest("Test translate " + word, () -> {
+            int id = in.indexOf(word);
+            assertEquals(out.get(id), translate(word));
+          })
+    );
+}
+
+We want to translate words using two ArrayList, named in and out, respectively. The factory method must return a Stream, Collection, Iterable, or Iterator. 
+In our case, we chose a Stream. 
+@TestFactory methods must not be private or static. The number of tests is dynamic, and it depends on the ArrayList size.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Testing a method:
+
+public boolean isNumberEven(Integer number) {
+    return number % 2 == 0;
+}
+
+Lets test if this method works correctly. It should return true if an even number is passed else false.
+
+@Test
+void testIfNumberIsEven() {
+    boolean result = bean.isNumberEven(8);
+
+    Assertions.assertTrue(result);
+
+    Assertions.assertTimeout(Duration.ofMillis(10), () -> bean.isNumberEven(3));   // checks for timeout.
+}
+
+@Test
+void testIfNumberIsOdd() {
+    boolean result = bean.isNumberEven(3);
+
+    Assertions.assertFalse(result);
+
+    Assertions.assertThrows(NullPointerException.class, () -> bean.isNumberEven(null));  // if test fails, it throws an exception
+}
+
+In order for the tests to be recognized as such, we’ll add the "@Test" annotation. We can have as many of these as we want in a class, but it’s a good practice 
+to put together only the related ones. Notice also that a test must not be private, nor may it return a value —otherwise it’ll just be ignored.
+
+If we now run a Maven build, the surefire plugin will go through all the annotated methods in the classes placed under src/test/java and execute them, causing the 
+build to fail if any test failures occur.

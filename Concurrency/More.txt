@@ -1,0 +1,454 @@
+* Runnable vs. Callable
+1.Both interfaces are designed to represent a task that can be run by multiple threads. 
+    We can run Runnable tasks using the Thread class or ExecutorService, whereas we can only run Callables using the latter.
+
+2. The Runnable interface is a functional interface and has a single run() method that doesn’t accept any parameters or return any values.
+    This works for situations where we aren’t looking for a result of the thread execution, such as incoming events logging.
+    The Callable interface is a generic interface containing a single call() method that returns a generic value V
+
+Runnable ex:
+public interface Runnable {
+    public void run();
+}
+
+public class EventLoggingTask implements  Runnable{
+    private Logger logger = LoggerFactory.getLogger(EventLoggingTask.class);
+
+    @Override
+    public void run() {        // the thread will just read a message from the queue and log it in a log file. No returned value
+        logger.info("Message");
+    }
+}
+
+public void executeTask() {
+    executorService = Executors.newSingleThreadExecutor();
+    executorService.submit(new EventLoggingTask());
+    executorService.shutdown();
+}
+
+Callable ex:
+public interface Callable<V> {
+    V call() throws Exception;
+}
+
+public class FactorialTask implements Callable<Integer> {
+    int number;
+
+    // standard constructors
+
+    public Integer call() throws InvalidParamaterException {
+        int fact = 1;
+        for(int count = number; count > 1; count--) {
+            fact = fact * count;
+        }
+
+        return fact;
+    }
+}
+
+@Test
+public void whenTaskSubmitted_ThenFutureResultObtained(){
+    FactorialTask task = new FactorialTask(5);
+    Future<Integer> future = executorService.submit(task);
+ 
+    assertEquals(120, future.get().intValue());
+}
+
+3. Since the method signature does not have the “throws” clause specified, we don’t have a way to propagate further checked exceptions. 
+    Callable‘s call() method contains the “throws Exception” clause, so we can easily propagate checked exceptions further.
+
+    In case of running a Callable using an ExecutorService, the exceptions are collected in the Future object. We can check this by making a call to 
+    the Future.get() method.
+
+    @Test(expected = ExecutionException.class)
+    public void whenException_ThenCallableThrowsIt() {
+    
+        FactorialCallableTask task = new FactorialCallableTask(-5);
+        Future<Integer> future = executorService.submit(task);
+        Integer result = future.get().intValue();
+    }
+
+    If we dont make the call to Future.get(), the exception will not be reported back and the task will still be marked as complete. We can call getCause()
+    on this exception object to get the original checked exception.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Difference Between Wait and Sleep:
+
+1. wait() is an instance method that’s used for thread synchronization. It can be called on any lock object, as it’s defined right on java.lang.Object, but it 
+can only be called from a synchronized block. It releases the lock on the object so that another thread can jump in and acquire a lock.
+
+On the other hand, Thread.sleep() is a static method that can be called from any context. Thread.sleep() pauses the current thread and does not release any locks.
+
+private static Object LOCK = new Object();
+
+private static void sleepWaitExamples() throws InterruptedException {
+ 
+    Thread.sleep(1000);
+    System.out.println("Thread '" + Thread.currentThread().getName() +"' is woken after sleeping for 1 second");
+ 
+    synchronized (LOCK) {
+        LOCK.wait(1000);       // wait is being called on "LOCK" object
+        System.out.println("Object '" + LOCK + "' is woken after" +" waiting for 1 second");
+    }
+}
+
+2. When we use the sleep() method, a thread gets started after a specified time interval, unless it is interrupted.
+
+For wait(), the waking up process is a bit more complicated. We can wake the thread by calling notify()/notifyAll() method on the monitor(LOCK in the above ex)
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* The thread.join() Method
+Like the wait() and notify() methods, join() is another mechanism of inter-thread synchronization. It is defined in the Thread class. When called on a thread instance, 
+the join() method forces the currently executing thread to pause its execution until the thread it's called on completes. However, overuse can lead to tightly coupled 
+code, making it less flexible and more prone to deadlocks.
+
+When we invoke the join() method on a thread, the calling thread goes into a waiting state. It remains in a waiting state until the referenced thread terminates.
+
+The join() method may also return if the referenced thread is interrupted. Finally, if the referenced thread was already terminated or hasn’t been started, the call 
+to join() method returns immediately.
+
+class SampleThread extends Thread {
+    public int processingCount = 0;
+
+    SampleThread(int processingCount) {
+        this.processingCount = processingCount;
+    }
+
+    @Override
+    public void run() {
+        while (processingCount > 0) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                LOGGER.info("Thread " + this.getName() + " interrupted");
+            }
+            processingCount--;
+            LOGGER.info("Inside Thread " + this.getName() + ", processingCount = " + processingCount);
+        }
+        LOGGER.info("Thread " + this.getName() + " exiting");
+    }
+}
+
+@Test
+public void method() throws InterruptedException {
+    Thread t2 = new SampleThread(1);
+    t2.start();         // This will call the constructor of SampleThread
+    LOGGER.info("Invoking join");
+    t2.join();        // Until here, "method" has the control. When join method is called, the control is given to thread "t2".
+    LOGGER.info("Returned from join");
+    assertFalse(t2.isAlive());
+}
+
+The join() method will keep waiting if the referenced thread is blocked or takes too long to process. This can become an issue as the calling thread will become 
+non-responsive. To handle these situations, we use overloaded versions of the join() method that allow us to specify a timeout period.
+There are two timed versions that overload the join() method:
+
+- public final void join(long millis) throws InterruptedException - Waits at most "millis" msec for this thread to die. A timeout of 0 means to wait forever
+- public final void join(long millis, int nanos) throws InterruptedException - Waits at most "millis" msecs + nanos nsecs for this thread to die
+
+join() creates a happens-before relationship. All actions in a thread happen-before any other thread successfully returns from a join() on that thread
+
+This means that when a thread t1 calls t2.join(), all changes done by t2 are visible in t1 on return. However, if we do not invoke join() or use other 
+synchronization mechanisms, we do not have any guarantee that changes in the other thread will be visible to the current thread even if the other thread 
+has been completed.
+
+Hence, even though the join() method call to a thread in the terminated state returns immediately, we still need to call it in some situations.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+* SEMAPHORES:
+
+We can use semaphores to limit the number of concurrent threads accessing a specific resource.
+
+- tryAcquire() – return true if a permit is available immediately and acquire it otherwise return false, but acquire() acquires a permit and blocking until 
+    one is available.
+- release() – release a permit
+- availablePermits() – return number of current permits available by this semaphore.
+
+Timed Semaphore:
+TimedSemaphore allows a number of permits as a simple Semaphore but in a given period of time, after this period the time resets and all permits are released.
+
+class DelayQueueUsingTimedSemaphore {
+    private TimedSemaphore semaphore;
+
+    DelayQueueUsingTimedSemaphore(long period, int slotLimit) {
+        semaphore = new TimedSemaphore(period, TimeUnit.SECONDS, slotLimit);
+    }
+
+    boolean tryAdd() {
+        return semaphore.tryAcquire();
+    }
+
+    int availableSlots() {
+        return semaphore.getAvailablePermits();
+    }
+}
+
+@Test
+public void givenDelayQueue_whenTimePass_thenSlotsAvailable() throws InterruptedException {
+    int slots = 50;
+    ExecutorService executorService = Executors.newFixedThreadPool(slots);
+    DelayQueueUsingTimedSemaphore delayQueue = new DelayQueueUsingTimedSemaphore(1, slots);
+
+    IntStream.range(0, slots)
+      .forEach(user -> executorService.execute(delayQueue::tryAdd));
+    executorService.shutdown();
+
+    assertEquals(0, delayQueue.availableSlots());   // true, coz all 50 semaphores have acquired the permits.
+    Thread.sleep(1000);
+    assertTrue(delayQueue.availableSlots() > 0);   // true, time period(1 sec) passed, all semaphores released their permits.
+    assertTrue(delayQueue.tryAdd());               // true
+}
+
+- Semaphore vs Mutex
+
+Mutex acts similarly to a binary semaphore, we can use it to implement mutual exclusion.
+
+class CounterUsingMutex {
+    private Semaphore mutex;
+    private int count = 0;
+
+    CounterUsingMutex() {
+        mutex = new Semaphore(1);
+    }
+
+    void increase() throws InterruptedException {
+        mutex.acquire();
+        this.count = this.count + 1;
+        Thread.sleep(1000);        // sleeps for 1 sec that means other threads can access this method for 1 sec(coz the thread holds the permit)
+        mutex.release();        // after 1 sec, permit is released so other threads can access the permit(& increase() method)
+    }
+
+    boolean hasQueuedThreads() {
+        return mutex.hasQueuedThreads();
+    }
+}
+
+@Test
+public void givenMutexAndMultipleThreads_ThenDelay_thenCorrectCount() throws InterruptedException {
+    int count = 5;
+    ExecutorService executorService = Executors.newFixedThreadPool(count);
+    CounterUsingMutex counter = new CounterUsingMutex();
+
+    IntStream.range(0, count)
+      .forEach(user -> executorService.execute(() -> {
+          try {
+              counter.increase();
+          } catch (InterruptedException e) {
+              e.printStackTrace();
+          }
+      }));
+    executorService.shutdown();
+
+    assertTrue(counter.hasQueuedThreads()); // true, 4 threads are in queue coz only 1 thread has permit for 1 sec.
+    Thread.sleep(5000);
+    assertFalse(counter.hasQueuedThreads()); // true, coz after 5 sec, all semaphores would have acquired and released their permits.
+    assertEquals(count, counter.getCount());  // 5
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+* Mutex
+A mutex (or mutual exclusion) is the simplest type of synchronizer, it ensures that only one thread can execute the critical section of a program at a time.
+
+To access a critical section, a thread acquires the mutex, then accesses the critical section, and finally releases the mutex. In the meantime, all other 
+threads block till the mutex releases. As soon as a thread exits the critical section, another thread can enter the critical section.
+
+EX: 
+public class SequenceGenerator {
+    
+    private int currentValue = 0;
+
+    public int getNextSequence() {
+        return currentValue++;
+    }
+}
+
+@Test
+public void givenUnsafeSequenceGenerator_whenRaceCondition_thenUnexpectedBehavior() throws Exception {
+    int count = 1000;
+    Set<Integer> uniqueSequences = getUniqueSequences(new SequenceGenerator(), count);
+    Assert.assertEquals(count, uniqueSequences.size());
+}
+
+private Set<Integer> getUniqueSequences(SequenceGenerator generator, int count) throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    Set<Integer> uniqueSequences = new LinkedHashSet<>();
+    List<Future<Integer>> list = new ArrayList<>();
+
+    for (int i = 0; i < count; i++) {
+        list.add(executor.submit(generator::getNextSequence));
+    }
+
+    for (Future<Integer> future : list) {
+        uniqueSequences.add(future.get());
+    }
+
+    executor.awaitTermination(1, TimeUnit.SECONDS);
+    executor.shutdown();
+
+    return uniqueSequences;
+}
+
+- Using synchronized Keyword:
+Every object in Java has an intrinsic lock associated with it. The synchronized method and the synchronized block use this intrinsic lock to restrict the 
+access of the critical section to only one thread at a time.
+
+Therefore, when a thread invokes a synchronized method or enters a synchronized block, it automatically acquires the lock. The lock releases when the method 
+or block completes or an exception is thrown from them.
+
+public class SequenceGeneratorUsingSynchronizedMethod extends SequenceGenerator {
+    
+    @Override
+    public synchronized int getNextSequence() {
+        return super.getNextSequence();
+    }
+}
+OR 
+public class SequenceGeneratorUsingSynchronizedBlock extends SequenceGenerator {
+    
+    private Object mutex = new Object();         //  synchronize on a custom mutex object
+
+    @Override
+    public int getNextSequence() {
+        synchronized (mutex) {
+            return super.getNextSequence();
+        }
+    }
+}
+
+- Using ReentrantLock:
+public class SequenceGeneratorUsingReentrantLock extends SequenceGenerator {
+    
+    private ReentrantLock mutex = new ReentrantLock();
+
+    @Override
+    public int getNextSequence() {
+        try {
+            mutex.lock();
+            return super.getNextSequence();
+        } finally {
+            mutex.unlock();
+        }
+    }
+}
+
+- Using Semaphore:
+Semaphore allows a fixed number of threads to access a critical section. Therefore, we can also implement a mutex by setting the number of allowed threads in a 
+Semaphore to 1.
+
+public class SequenceGeneratorUsingSemaphore extends SequenceGenerator {
+    
+    private Semaphore mutex = new Semaphore(1);
+
+    @Override
+    public int getNextSequence() {
+        try {
+            mutex.acquire();
+            return super.getNextSequence();
+        } catch (InterruptedException e) {
+        } finally {
+            mutex.release();
+        }
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* ASYNCHRONOUS PROGRAMMING:
+ - We can create a new thread to perform any operation asynchronously. With the release of lambda expressions in Java 8, it’s cleaner and more readable.
+
+Thread newThread = new Thread(() -> {
+    System.out.println("Factorial of " + number + " is: " + factorial(20));
+});
+newThread.start();
+
+- Future interface provides a way to perform asynchronous operations using the FutureTask. We can use the submit method of the ExecutorService to perform 
+the task asynchronously and return the instance of the FutureTask.
+
+ExecutorService threadpool = Executors.newCachedThreadPool();
+Future<Long> futureTask = threadpool.submit(() -> factorial(number));
+
+while (!futureTask.isDone()) {
+    System.out.println("FutureTask is not finished yet..."); 
+} 
+long result = futureTask.get(); 
+
+threadpool.shutdown();
+
+- CompletableFuture is a combination of a Future and CompletionStage. It provides various methods like supplyAsync, runAsync, and thenApplyAsync for 
+asynchronous programming.
+
+CompletableFuture<Long> completableFuture = CompletableFuture.supplyAsync(() -> factorial(number));
+while (!completableFuture.isDone()) {
+    System.out.println("CompletableFuture is not finished yet...");
+}
+long result = completableFuture.get();
+
+- Electronic Arts brought the async-await feature from .NET to the Java ecosystem through the ea-async library. This library allows writing asynchronous 
+(non-blocking) code sequentially. 
+
+static { 
+    Async.init(); 
+}
+
+public long factorialUsingEAAsync(int number) {
+    CompletableFuture<Long> completableFuture = CompletableFuture.supplyAsync(() -> factorial(number));
+    long result = Async.await(completableFuture);
+}
+
+EX:
+Using CompletableFuture's composition methods like thenComposeAsync etc.
+
+CompletableFuture<Void> completableFuture = hello()
+  .thenComposeAsync(hello -> mergeWorld(hello))
+  .thenAcceptAsync(helloWorld -> print(helloWorld))
+  .exceptionally(throwable -> {
+      System.out.println(throwable.getCause()); 
+      return null;
+  });
+completableFuture.get();
+
+Using EA's Async.await():
+
+try {
+    String hello = await(hello());
+    String helloWorld = await(mergeWorld(hello));
+    await(CompletableFuture.runAsync(() -> print(helloWorld)));
+} catch (Exception e) {
+    e.printStackTrace();
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Thread Scheduler and Thread Priority in Java:
+Threads do not guarantee the execution order. When a thread moves into a RUNNABLE state, it doesn’t starts immediately, it has to wait for the thread scheduler to
+allocate the CPU time for the threda to execute.
+
+Thread scheduling is an aspect of multi-threading that deals with deciding which threads should run at any given time. The thread scheduler is responsible for 
+determining the order and timing for each thread's execution. In Java, thread scheduling is managed at the JVM level and is mostly dependent on underlying OS 
+implementations. There are mainly two types of thread schedulers based on how they schedule threads:
+
+1. Preemptive Scheduler: If a higher-priority thread becomes available to run, the current running thread can be preempted, i.e., interrupted, to allow the higher 
+priority thread to execute. Java, by default, uses preemptive scheduling based on thread priorities but it depends on OS & JVM implements.
+
+2. Time-slicing (Round-robin) Scheduler: Each thread gets a small quantum of CPU time (a time slice). If it doesn't complete within that time, the CPU is given to 
+the next thread. This ensures that all threads get a fair share of the CPU time.
+
+Thread Priority: Every Java thread has a priority that helps the scheduler determine the order of thread execution. Priorities are integers ranging between 
+    Thread.MIN_PRIORITY (1) and Thread.MAX_PRIORITY (10). The default priority of a thread is Thread.NORM_PRIORITY (5).
+
+    Thread t = new Thread();
+    t.setPriority(Thread.MAX_PRIORITY);  // Setting the priority
+    int priority = t.getPriority();   // Getting the current priority
+
+Thread scheduler generally executes the threads with higher priority. But it doesn’t guarantees that will happen always. The thread with higer priority has greater
+chances of executing before the lower priority threads.
+
+Caveats:
+- Relying too much on thread priorities can lead to thread starvation where lower-priority threads might never get a chance to run.
+- Thread priorities behave differently across different operating systems and JVMs. For instance, Windows has 7 priority levels which mean multiple Java priority 
+    levels might map to a single OS priority.
+
+Ensuring Sequential Execution of Threads:
+1. Synchronized Blocks: Using the synchronized keyword, you can ensure that only one thread can execute a synchronized block at a time, maintaining order.
+
+2. Join: This method allows a thread to wait until another thread completes its execution. This can be used to ensure one thread doesn't start until another finish.
+
+3. CountDownLatch: A concurrency utility that allows one or more threads to wait until a set of operations being performed in other threads is complete.
+
+4. Semaphores, Locks, and Barriers:

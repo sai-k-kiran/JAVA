@@ -1,0 +1,476 @@
+* Difference between query, native query, named query and typed query.
+
+- Query
+
+Query refers to JPQL/HQL query with syntax similar to SQL generally used to execute DML statements(CRUD operations).In JPA, you can create a query using 
+entityManager.createQuery(). In Hibernate, you use session.createQuery(). There are two additional Query sub-types: TypedQuery & NamedQuery
+
+Query query = entityManager.createQuery("FROM User u WHERE u.id=:id");
+query.setParameter("id", id);
+return (User) query.getSingleResult();     // retrieves the matching record from the users table & also maps it to the User object.
+
+- NamedQuery
+
+NamedQuery is the way you define your query by giving it a name. You could define this query in a file or also using annotations at entity level.
+
+While we can dynamically define a Query on specific methods, they can eventually grow into a hard-to-maintain codebase. What if we could keep general usage 
+queries in one centralized, easy-to-read place?
+
+We can define NamedQueries in orm.xml or a properties file. All NamedQueries must have a unique name.
+Also, we can define NamedQuery on the Entity class itself, providing a centralized, quick and easy way to read and find an Entity‘s related queries.
+
+It’s important to note that every @NamedQuery annotation is attached to exactly one entity class or mapped superclass. But, since the scope of named queries 
+is the entire persistence unit, we should select the query name carefully to avoid a collision
+
+@Entity
+@NamedQuery(name = "user_findById", query = "FROM UserEntity u WHERE u.id=:userId")
+public class UserEntity {
+    @Id
+    private Long id;
+}
+
+public UserEntity getUserByIdWithNamedQuery(Long id) {
+    Query namedQuery = em.createNamedQuery("user_findById");
+    namedQuery.setParameter("userId", id);
+    return (UserEntity) namedQuery.getSingleResult();
+}
+
+We can set various query features with the @NamedQuery annotation:
+@NamedQuery(
+  name = "user_findByDept", query = "FROM UserEntity u WHERE dept = :dept",
+  timeout = 1, fetchSize = 10
+)
+
+Apart from these two, we can also set features such as:
+    - cacheable – whether the query (results) is cacheable or not
+    - cacheMode – the cache mode used for this query; this can be one of GET, IGNORE, NORMAL, PUT, or REFRESH
+    - cacheRegion – if the query results are cacheable, name the query cache region to use
+    - comment – a comment added to the generated SQL query; targetted for DBAs
+    - flushMode – the flush mode for this query, one of ALWAYS, AUTO, COMMIT, MANUAL, or PERSISTENCE_CONTEXT
+
+Named Native Query:
+
+As well as HQL queries, we can also define native SQL as a named query. To do this, we can use the @NamedNativeQuery annotation. Though it is similar to the 
+@NamedQuery, it requires a bit more configuration.
+
+@NamedNativeQueries(
+    NamedNativeQuery(name = "user_findByDept", 
+      query = "select * from UserEntity emp WHERE dept = :dept", resultClass = UserEntity.class)
+)
+
+Since this is a native query, we’ll have to tell Hibernate what entity class to map the results to, we’ve used the "resultClass" property for doing this.
+
+Query<UserEntity> query = session.createNamedQuery("user_findByDept", UserEntity.class);  // OR session.getNamedNativeQuery("user_findByDept"), requires casting
+query.setParameter("dept", "Finance");
+UserEntity result = query.getSingleResult();   // If you use session.getNamedNativeQuery(), then (UserEntity) query.getSingleResult();
+
+We can use the @NamedNativeQuery annotation to define calls to stored procedures and functions:
+
+@NamedNativeQuery(
+  name = "user_stored_procedure", query = "call UPDATE_USER_DESIGNATION(:userId, :newDesignation)", 
+  resultClass = UserEntity.class)
+
+- TypedQuery
+
+TypedQuery gives you an option to mention the type of entity when you create a query and therefore any operation thereafter does not need an explicit cast to the 
+intended type. Whereas the normal Query API does not return the exact type of Object you expect and you need to cast.
+
+This is always preferred if we know our Query result type beforehand. Additionally, it makes our code much more reliable and easier to test.
+
+TypedQuery<Product> q = em.createQuery("SELECT u FROM User u WHERE u.id=:id", Product.class);
+q.setParameter("id", id);
+
+- NativeQuery  (See later in the file for details)
+
+Native query refers to actual sql queries. These queries are the sql statements which can be directly executed in database using a db client.
+This comes at a cost. We lose the db portability of our app with NativeQuery because our JPA provider can’t abstract specific details from the db implementation.
+
+JPA : entityManager.createNativeQuery("SELECT * FROM users", UserEntity.class) 
+Hibernate (Non-JPA implementation): session.createSQLQuery()
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Criteria Queries:
+
+Hibernate provides alternate ways of manipulating objects and in turn data available in RDBMS tables. One of the methods is Criteria API, which allows 
+you to build up a criteria query object programmatically where you can apply filtration rules and logical conditions.
+
+It enables us to write queries without doing raw SQL as well as gives us some object-oriented control over the queries, which is one of the main features of Hibernate. 
+The Criteria API allows us to build up a criteria query object programmatically, where we can apply different kinds of filtration rules and logical conditions.
+
+The Hibernate Session interface provides createCriteria() method, which can be used to create a Criteria object that returns instances of the persistence 
+object's class when your application executes a criteria query. Since Hibernate 5.2, the Hibernate Criteria API is deprecated.
+
+    CriteriaBuilder cb = session.getCriteriaBuilder();
+    CriteriaQuery<Item> cr = cb.createQuery(Item.class);
+    Root<Item> root = cr.from(Item.class);
+    cr.select(root);
+
+    Query<Item> query = session.createQuery(cr);
+    List<Item> results = query.getResultList();
+
+- You can use add() method available for Criteria object to add restriction for a criteria query. 
+
+    Criteria cr = session.createCriteria(Employee.class);
+    cr.add(Restrictions.eq("salary", 2000));           // add a restriction to return the records with salary is equal to 2000
+    List results = cr.list();
+
+    cr.select(root).where(cb.gt(root.get("itemPrice"), 1000));  // get items having a price > 1000
+
+    cr.select(root).where(cb.lt(root.get("itemPrice"), 1000));  // get items having a price < 1000
+
+    cr.select(root).where(cb.between(root.get("itemPrice"), 100, 200));   // get items having a price between 100 & 200
+
+    cr.select(root).where(root.get("itemName").in("Skate Board", "Paint", "Glue"));  // Items having itemName in Skate Board, Paint and Glue:
+  
+Create AND or OR conditions using LogicalExpression restrictions:
+
+    Criteria cr = session.createCriteria(Employee.class);
+
+    Criterion salary = Restrictions.gt("salary", 2000);
+    Criterion name = Restrictions.ilike("firstName","zara%");
+
+    LogicalExpression orExp = Restrictions.or(salary, name);    // return records with mentioned salary or name
+    cr.add( orExp );
+
+    OR, you can using predicates
+
+    Predicate[] predicates = new Predicate[2];
+    predicates[0] = cb.gt(root.get("salary"), 2000);             // Predicate greaterThanPrice = cb.gt(root.get("salary"), 2000); 
+    predicates[1] = cb.like(root.get("firstName"), "zara%");     // Predicate chairItems = cb.like(root.get("firstName"), "zara%");
+    cr.select(root).where(predicates);
+
+Pagination Using Criteria:
+
+    Criteria setFirstResult(int firstResult) - takes an integer that represents the first row in your result set, starting with row 0.
+
+    Criteria setMaxResults(int maxResults) - retrieve a fixed "maxResults" number of objects.
+
+    Criteria cr = session.createCriteria(Employee.class);
+    cr.setFirstResult(1);
+    cr.setMaxResults(10);
+    List results = cr.list();
+
+Sorting:
+
+    Criteria cr = session.createCriteria(Employee.class);
+
+    cr.add(Restrictions.gt("salary", 2000));
+    cr.addOrder(Order.desc("salary"));    // desc order of salary
+
+    OR 
+
+    cr.orderBy(
+        cb.asc(root.get("itemName")), 
+        cb.desc(root.get("itemPrice")));
+
+    List results = cr.list();
+
+Projections & Aggregations:
+The Criteria API provides the Projections class, which can be used to get avg, max, min, sum etc of the property values. The Projections class is similar to 
+the Restrictions class, in that it provides several static factory methods for obtaining Projection instances.
+
+    Criteria cr = session.createCriteria(Employee.class);
+
+    cr.setProjection(Projections.rowCount());
+    cr.setProjection(Projections.avg("salary"));           // replace "avg" with max/min/sum
+
+    cr.setProjection(Projections.countDistinct("firstName"));
+
+    OR
+
+    CriteriaQuery<Long> cr = cb.createQuery(Long.class);
+    Root<Item> root = cr.from(Item.class);
+    cr.select(cb.count(root));                   // get row count
+    Query<Long> query = session.createQuery(cr);
+    List<Long> itemProjected = query.getResultList();
+
+    CriteriaQuery<Double> cr = cb.createQuery(Double.class);
+    Root<Item> root = cr.from(Item.class);
+    cr.select(cb.avg(root.get("itemPrice")));       // get avg of price of all items
+    Query<Double> query = session.createQuery(cr);
+    List avgItemPriceList = query.getResultList();
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Result Set Mapping:
+
+The query methods using native SQL queries(createQuery(), createSQLQuery(), createNativeQuery) return a List<Object[]> where Object[] contains the object of one row. 
+This object contains all the columns. The list contains all the returned rows as Object[]. To use the columns from the returned list, we have to iterate the list & cast 
+each Object to the appropriate Entity class. This creates lots of repetitive code and type casts
+
+List<Object[]> results = em.createNativeQuery("SELECT a.id, a.firstName, a.lastName, a.version FROM Author a")
+                           .getResultList();
+ 
+results.stream().forEach((record) -> {
+        Long id = ((BigInteger) record[0]).longValue();
+        String firstName = (String) record[1];
+        String lastName = (String) record[2];
+        Integer version = (Integer) record[3];
+});
+
+To map the result of the native queries to an Entity class is called SQL result set mapping. 
+
+@Entity
+class Author{
+    @Id
+    Long id;
+
+    @Column
+    String firstName;
+
+    @Column
+    String lastName;
+}
+
+The easiest way to map a query result to an entity is to provide the entity class as a parameter to the createNativeQuery(String sqlString, Class resultClass) method of 
+the EntityManager and use the default mapping. In a real project, you would use this with a stored procedure or a very complex SQL query. 
+
+List<Author> results = em.createNativeQuery("SELECT a.id, a.firstName, a.lastName FROM Author a", Author.class).getResultList();
+
+For a complex query, the columns(name, no. etc) returned by the query dont match with that of the entity class. In that case, we have to define custom mappings.
+This can be done with annotations or in a mapping file (e.g. orm.xml).
+
+@SqlResultSetMapping:  "@EntityResult"
+The mapping consists of a name and an @EntityResult definition. The name of the mapping, "AuthorMapping" will later be used to tell the EntityManager which mapping to 
+use. The @EntityResult defines the entity class to which the result shall be mapped and an array of @FieldResult which defines the mapping between the column name and 
+the entity property. Each @FieldResult gets the name of the property and the column name as a parameter.
+
+You can not only use it to map your query result to managed entity objects but also to DTOs, scalar values, and any combination of these
+
+@SqlResultSetMapping(
+        name = "AuthorMapping",
+        entities = @EntityResult(
+                entityClass = Author.class,
+                fields = {
+                    @FieldResult(name = "id", column = "authorId"),
+                    @FieldResult(name = "firstName", column = "firstName"),
+                    @FieldResult(name = "lastName", column = "lastName"),
+                    @FieldResult(name = "version", column = "version")}))
+
+This is a repeatable annotation i.e we can put many such annotations on an entity class(since hibernate 5). If you dont want to write huge codes in the annotation,
+you can define the mapping in the orm.xml file.
+
+<sql-result-set-mapping name="AuthorMappingXml">
+    <entity-result entity-class="org.thoughts.on.java.jpa.model.Author">
+        <field-result name="id" column="authorId"/>
+        <field-result name="firstName" column="firstName"/>
+        <field-result name="lastName" column="lastName"/>
+        <field-result name="version" column="version"/>
+    </entity-result>
+</sql-result-set-mapping>
+
+	
+List<Author> results = em.createNativeQuery("SELECT a.id as authorId, a.firstName, a.lastNameFROM Author a", "AuthorMapping").getResultList();
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+@SqlResultSetMapping:  "@ColumnResult"
+
+@Entity
+class Book{    
+    @Id
+    Long id;
+
+    @Column
+    String title;
+
+    @ManyToOne
+    private Author author;   // reference to author
+}
+
+We provide two @EntityResult annotations, one for the Book and one for the Author entity. The @EntityResult looks again similar to the previous mapping and defines 
+the entity class and a list of @FieldResult mappings.
+
+@SqlResultSetMapping(         //  Add a new <entity-result entity-class = Book> with Author mapping inside "BookAuthorMappingXml" 
+        name = "BookAuthorMapping",
+        entities = {
+            @EntityResult(
+                    entityClass = Book.class,
+                    fields = {
+                        @FieldResult(name = "id", column = "id"),
+                        @FieldResult(name = "title", column = "title"),
+                        @FieldResult(name = "author", column = "author_id")}),
+            @EntityResult(
+                    entityClass = Author.class,
+                    fields = {
+                        @FieldResult(name = "id", column = "authorId"),
+                        @FieldResult(name = "firstName", column = "firstName"),
+                        @FieldResult(name = "lastName", column = "lastName")})});
+
+List<Object[]> results = em.createNativeQuery("SELECT b.id, b.title, b.author_id, a.id as authorId, a.firstName, a.lastName FROM Book b 
+                                            JOIN Author a ON b.author_id = a.id", "BookAuthorMapping").getResultList();
+ 
+results.stream().forEach((record) -> {
+    Book book = (Book)record[0];
+    Author author = (Author)record[1];
+    // do something useful
+});
+
+If we want to select all Authors and their number of Books, we can define the following query.
+	
+SELECT a.id, a.firstName, a.lastName, count(b.id) as bookCount FROM Book b JOIN Author a ON b.author_id = a.id 
+GROUP BY a.id, a.firstName, a.lastName
+
+@SqlResultSetMapping(
+        name = "AuthorBookCountMapping",
+        entities = @EntityResult(
+                entityClass = Author.class,
+                fields = {
+                    @FieldResult(name = "id", column = "id"),
+                    @FieldResult(name = "firstName", column = "firstName"),
+                    @FieldResult(name = "lastName", column = "lastName")}),
+        columns = @ColumnResult(name = "bookCount", type = Long.class)) // @ColumnResult defines the name of the column that shall be mapped and can specify the
+                                                                        // type to which it shall be converted
+
+List<Object[]> results = em.createNativeQuery("SELECT a.id, a.firstName, a.lastName, count(b.id) as bookCount FROM Book b JOIN Author a ON b.author_id = a.id
+                                             GROUP BY a.id, a.firstName, a.lastName", "AuthorBookCountMapping").getResultList();
+ 
+results.stream().forEach((record) -> {
+    Author author = (Author)record[0];
+    Long bookCount = (Long)record[1];
+});                                                            
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+@SqlResultSetMapping:  "@ConstructorResult"
+
+This feature allows us to call the constructor of a value object with the result of the query, similar to the JPQL constructor expressions. This is often used, if we 
+want to provide a specific view of our domain model to the client.
+JPQL supports constructor expressions that can be specified in the select part of the JPQL query and define the constructor call for each selected record.
+
+In this ex, we want to map some fields from both Book & Author class to a "BookValue" class. 
+
+@SqlResultSetMapping(
+        name = "BookValueMapping",
+        classes = @ConstructorResult(
+                targetClass = BookValue.class,
+                columns = {
+                    @ColumnResult(name = "id", type = Long.class),
+                    @ColumnResult(name = "title"),
+                    @ColumnResult(name = "authorName")}))
+
+The @ConstructorResult annotation defines the constructor call for a given target class. The array of @ColumnResult annotations defines the columns of the query 
+result that will be used as constructor parameters with their type and order.                
+
+	
+List<BookValue> results = em.createNativeQuery("SELECT b.id, b.title, a.firstName || a.lastName as authorName FROM Book b JOIN Author a ON b.author_id = a.id", 
+                                                "BookValueMapping").getResultList();
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Native Queries
+
+The Java Persistence Query Language (JPQL) is the most common way to query data from a db with JPA. But it supports only a small subset of the SQL standard, and it 
+also provides no support for db-specific features.
+For that, JPA has its own query language, but it’s designed as a leaky abstraction and supports native SQL queries
+
+1. Create ad-hoc native queries:
+
+The EntityManager interface provides the "createNativeQuery()" method for it. Returns an implementation of the Query interface, which is the same that you get when you
+call the createQuery() method. The persistence provider does not parse the SQL statement so you can use any SQL statement your db supports.
+
+Query q = em.createNativeQuery("SELECT a.firstname, a.lastname FROM Author a");
+List<Object[]> authors = q.getResultList();
+
+2. Create named native queries:
+Since Hibernate 5 and JPA 2.2, this annotation is repeatable, you can add multiple of it to your entity class. Before that, you have to use @NamedNativeQueries.
+
+@NamedNativeQuery(name = "selectAuthorNames", 
+                  query = "SELECT a.firstname, a.lastname FROM Author a")
+@Entity
+public class Author { ... }
+
+Query q = em.createNamedQuery("selectAuthorNames");
+List<Object[]> authors = q.getResultList();
+
+JPQL and native SQL queries use the same Query interface, which provides a setParameter method for positional and named parameter bindings. But the support of named 
+parameter bindings for native queries is a Hibernate-specific feature. Positional parameters are referenced as “?” in your native query and their numbering starts at 1.
+
+Query q = em.createNativeQuery("SELECT a.firstname, a.lastname FROM Author a WHERE a.id = ?");  // positional binding
+q.setParameter(1, 1);
+Object[] author = (Object[]) q.getSingleResult();
+
+Query q = em.createNativeQuery("SELECT a.firstname, a.lastname FROM Author a WHERE a.id = :id");  // named binding
+q.setParameter("id", 1);
+Object[] author = (Object[]) q.getSingleResult();
+
+Result handing (mapping the result of query to java classes):
+
+- You can map each record of your query result to a managed entity using the entity’s mapping definition.
+
+    Query q = em.createNativeQuery("SELECT a.id, a.firstname, a.lastname FROM Author a", Author.class);
+    List<Author> authors = (List<Author>) q.getResultList();
+                                // OR
+    @NamedNativeQuery(name = "selectAuthorEntities", 
+                    query = "SELECT a.id,, a.firstname, a.lastname FROM Author a", 
+                    resultClass = Author.class)
+    @Entity
+    public class Author { ... }
+
+- You can use JPA’s @SqlResultSetMapping annotation to map each result record to a combination of DTOs, managed entities, or scalar values.
+
+    Find in this file for detailed explanantion.
+
+- And you can use Hibernate’s ResultTransformer to map each record or the entire result set to DTOs, managed entities, or scalar values.
+
+ResultTransformers(deprecated, use TupleTranformer) are a Hibernate-specific feature with the same goal as JPA’s @SqlResultSetMapping. They allow you to define a 
+custom mapping of the resultset of your native query. But in contrast to the @SqlResultSetMapping, you implement that mapping as Java code, and you can map each 
+record or the entire result set.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Hibernate Query Spaces – Optimizing Flush and Cache Operations
+
+Hibernate needs to ensure that all tables referenced in a query are up to date before executing the query. That means it has to flush all pending changes for these 
+tables before it runs the query. Otherwise, the database would process the query on an outdated data set and return wrong results.
+
+Hibernate not only handles this step automatically but also tries to do that as efficiently as possible. Based on the query statement, Hibernate tries to detect 
+which tables the query references. This is called the “query space”. Based on the query space, Hibernate decides if it needs to flush any changes to the database.
+
+The query space also helps Hibernate identifying the parts of the 2nd level cache it needs to invalidate when using a modifying query to implement a bulk operation. 
+Hibernate doesn’t know which database records and entity objects are affected by it when you execute such a query. It has to invalidate all objects of an entity class 
+referenced by the query space, e.g., all cached ChessPlayer entities. If the query space is empty, Hibernate needs to invalidate the entire 2nd level cache.
+
+Hibernate generates the SQL for JPQL & criteria statements & if we define the query with hibernate/JPA API's e.g calling em.find(). Hibernate detects the query
+space automatically & determines if it needs to flush any changes.
+
+em.getTransaction().begin();
+ 
+ChessPlayer player = em.find(ChessPlayer.class, 1L);
+player.setFirstName("Magnus").setLastName("Carlsen");
+
+log.info("JPQL Query");
+em.createQuery("SELECT t FROM ChessTournament t WHERE t.name LIKE '%Zurich%'", ChessTournament.class).getResultList();
+
+log.info("Flush and Commit");
+em.getTransaction().commit();
+em.close();
+
+15:21:38,973 DEBUG SQL:144 - select ChessPlayer where id = ?
+15:21:39,014  INFO TestNativeUpdate:49 - JPQL Query   // log.info("JPQL Query")
+15:21:39,110 DEBUG SQL:144 - SELECT t FROM ChessTournament t WHERE t.name LIKE '%Zurich%'
+15:21:39,115  INFO TestNativeUpdate:53 - Flush and Commit  // log.info("Flush and Commit");
+15:21:39,123 DEBUG SQL:144 - update ChessPlayer set birthDate=?, firstName=?, lastName=?, version=? where id=? and version=?
+
+See from logs that the update of ChessPlayer didnt happen until the commit. It happened after commiting the query
+
+The query space of JPQL query only includes the ChessTournament but not the ChessPlayer table. Due to that, Hibernate doesn’t flush the ChessPlayer entity to the 
+db until you commit the transaction.
+
+Using native queries, hibernate doesnt know which tables the query references. The query space is empty &  Hibernate can’t check if it needs to flush a dirty 
+entity(modified but not commited). Due to that, it always has to flush all dirty entities.
+
+ChessPlayer player = em.find(ChessPlayer.class, 1L);
+player.setFirstName("Magnus").setLastName("Carlsen");
+ 
+log.info("Native Query");
+em.createNativeQuery("SELECT * FROM ChessTournament t WHERE t.name LIKE '%Zurich%'", ChessTournament.class).getResultList();
+ 
+log.info("Flush and Commit");
+em.getTransaction().commit();
+em.close();
+
+15:23:58,129 DEBUG SQL:144 - select ChessPlayer where id = ?
+15:23:58,157  INFO TestNativeUpdate:74 - Native Query
+15:23:58,190 DEBUG SQL:144 - update ChessPlayer set birthDate=?, firstName=?, lastName=?, version=? where id=? and version=?
+15:23:58,206 DEBUG SQL:144 - SELECT * FROM ChessTournament t WHERE t.name LIKE '%Zurich%'
+15:23:58,212  INFO TestNativeUpdate:78 - Flush and Commit
+
+Note that update of ChessPlayer happens before commiting. Hibernate now flushed the dirty ChessPlayer entity before it executed the native query even though it 
+wasn’t necessary. To get the same optimized behavior as provided for a JPQL statement, you need to tell Hibernate which query spaces your native query references. 
+You can do that via Hibernate’s SynchronizeableQuery interface or since Hibernate 5.3.20 and 5.4.24 by setting the query hint org.hibernate.query.native.spaces.

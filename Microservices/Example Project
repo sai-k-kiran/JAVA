@@ -1,0 +1,350 @@
+In our Employee module --> write these lines in application.properties:
+
+spring.application.name=employee-app
+server.port=8080
+server.server.context-path=/employee-app/api         // context path 
+
+addressservice.base.url=http://localhost:8081/address-app/api
+
+address-app.ribbon.listOfServers = http://localhost:8081, http://localhost:8082            // If we use ribbon
+
+management.endpoints.web.exposure.include=*        // This is for spring actuator info 
+
+management.info.env.enabled=true
+
+info.app.name=Employee App                    // this will show on ip:port/context-path/actuator/info
+info.app.description=Microservices App
+info.app.version=1.0.0
+Add Spring Boot actuator dependency in pom.xml
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+In our Address module --> write these lines in application.properties:
+
+spring.application.name=address-app
+server.port=8081
+server.server.context-path=/address-app/api         // context path 
+
+eureka.instance.metadata-map.configPath=/address-app/api    // setting context path
+
+We have set context path so our API endpoint would look like this:
+
+http://localhost:8080/employee-app/api/employees/1      --> Get the details of employee with empId = 1;
+
+http://localhost:8081/address-app/api/address/1      --> Get the address of employee with empId = 1;
+
+In Employee and Address app main class, write "@EnableEurekaClient" under "@SpringBootApplication".
+
+You can replace @EnableEurekaClient with @EnableDisccoveryClient to replace eureka with other libraries like zookeeper or consuul
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Services in the app:
+
+1. Employee  --> Running on port 8080
+2. Address
+
+First create the Employee module. Set its properties in the application.properties file. Connect a MySql database.
+
+1. Add an Entity "Employee" with its fields, getter & setters.
+
+2. Create an interface EmployeeRepository that extends JPARepository<Employee, Integer>
+
+Create an App config class:
+
+@Configuration
+public class Config{
+
+    @Value("${addressservice.base.url}") 
+    private String addressBaseUrl;
+
+    @Bean
+    public ModelMapper mapper(){
+        return new ModelMapper();    // this is required else spring boot will say that Model Mapper bean not found
+    }
+
+    @Bean
+    public RestTemplate restTemplate(){    // RestTemplate is deprecated so spring doesnt provide this
+        return RestTemplate();
+    }
+
+    @LoadBalanced    // This annotation enables us to call a microservice by its name instead of its IP address. See callUsingRestTemplate()
+    @Bean
+    public WebClient webClient(){
+        return WebClient
+                .builder()
+                .baseUrl(addressBaseUrl)
+                .build().
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+3. Create a EmployeeService class:
+
+@Service
+public class EmployeeService{
+    // @Autowired
+    // private DiscoveryClient discoveryClient;
+
+    // List<ServiceInstance> instances = discoveryClient.getInstances("address-app");
+    // ServiceInstance instance = instances.get(0);     // This will always get the 1st server from all the available servers, no balancing
+
+    // String uri = instance.getUri().toString();
+
+    private LoadBalancer loadBalancerClient;                 // To use other discovery clients like zookeeper, consuul etc.
+    ServiceInstance instance = loadBalancerClient.choose("address-app");     // This will get different servers every time
+    String uri = instance.getUri().toString();
+
+    String contextPath = instance.getMetadata().get("cinfigPath");
+
+    @Autowired
+    RestTemplate template;             // This is not auto configured by spring. Create a bean in config class if Autowiring.
+
+    // constructor injection. No need to create a bean in config class
+    public EmployeeService(@Value("${addressservice.base.url}") String addressBaseUrl, RestTemplateBuilder builder){         
+        this.restTemplate = builder
+                      //    .rootUri(uri)  - base uri derived from eureka discovery client. Use this instead of hardcoding uri in application.properties
+                            .rootUri(addressBaseUrl)        // this will concat with the url in getForObject() method
+                            .build;
+    }
+
+    @Autowired
+    private WebClient webClient;
+
+    @Autowired
+    EmployeeRepository repository;
+
+    @Autowired
+    ModelMapper mapper;   // 3rd party API, add dependency in pom.xml. Create a bean for Model Mapper class in config class
+
+    @Autowired
+    private AddressClient addressClient;
+
+    public EmployeeResponse getEmployee(Integer id){
+        Employee emp =  repository.findEmployeeById(id).get();
+
+        // map the Employee to EmployeeResponse using a model mapper;
+        EmployeeResponse empResponse = mapper.map(emp, EmployeeResponse.class);
+
+        ResponseEntity<AddressResponse> addressResponseEntity = addressClient.getAdddressOfEmployee(id);
+        AddressResponse response = addressResponseEntity.getBody();
+
+        // AddressResponse addressResponse = callUsingWebClient(id);  // Using RestTemplte OR Web Client
+
+        empResponse.setAddressResponse(addressResponse);
+        return empResponse;
+    }
+
+    public AddressRepository callUsingRestTemplate(int id){         // synchronous call to Address Module endpoint
+        return template.getForObject(contextPath + "/address/{id}", AddressResponse.class, id);
+        // return template.getForObject("http://address-app/address-app/api/address/{id}", AddressResponse.class, id);
+        // http://service-name/context-path/endpoint/{path var}      --> This will work too
+    }
+
+    public AddressRepository callUsingWebClient(int id){             // Asynchronous call to Address Module endpoint
+        return webClient.get()             
+                .uri(contextPath + "/address/{id}", id)
+                .retrieve()
+                .bodyToMono(AddressResponse.class)
+                .block()
+    }
+
+    public ResponseEntity<List<EmployeeResponse>> getEmployees(){
+        List<Employee> list = repository.findAll();
+
+        List<EmployeeResponse> empList =  Arrays.asList(mapper.map(list, EmployeeResponse[].class));
+
+        ResponseEntity<List<AddressResponse>> addressResponse = addressClient.getAllAddress();
+        List<AddressResponse> addressList = addressResponse.getBody();
+
+        empList.forEach(emp -> {
+            for(AddressResponse address : addressList){
+                if(address.getEmpId() == emp.getId){
+                    emp.setAddressResponse(address);
+                }
+            }
+        })
+
+        return  empList;
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+4. EmployeeResponse class:
+
+public class EmployeeResponse{
+    //copy all the fields, getters and setters from Employee class.
+}
+
+5. Inside EmployeeController.java:
+
+@RestController
+public class EmployeeController{
+
+    @Autowired
+    EmployeeService service;
+
+    @GetMapping("/employees/{id}")
+    public ResponseEntity<EmployeeResponse> getEmployeeDetails(@PathVariable("id") Integer id){
+        // Employee emp = service.getEmployee(id);
+        // instead of returning emp object directly, we will return a model object(EmployeeResponse)
+
+        EmployeeResponse res = service.getEmployee(id);
+        return ResponseEntity.status(HttpStatus.OK).body(res);
+    }   
+
+    @GetMapping("employees")
+    ResponseEntity<List<EmployeeResponse>> getAllEmployees(){
+        List<EmployeeResponse> list = Service.getEmployees();
+        return ResponseEntity.status(HttpStatus.OK).body(list);
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Add dependency for spring-cloud-starter-openfeign in pom.xml
+Downgrade spring cloud version to 2.x & spring boot version to 2.7.x i.e the dependencies should be before 2020 because Ribbon load balancer from spring
+cloud was removed after 2020.
+
+Create a new Package: feignclient Inside that, create an interface: AddressClient
+
+Add "@EnableFeignClients" in the root of the Employee class, under @SpringBootApplication annotation.
+
+@FeignClient(name="address-app", path="/address-app/api")
+@RibbonClient(name="address-app")
+public interface AddressClient{
+    @GetMapping("/address/{id}")
+    public ResponseEntity<AddressResponse> getAddressOfEmployee(@PathVariable("id") Integer id);  // same as AddressController's get mapping
+
+    @GetMapping("/address")
+    public ResponseEntity<List<AddressResponse>> getAllAddress();
+}
+
+EMPLOYEE MODULE IS DONE
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+CREATE AN ADDRESS MODULE(SERVICE):
+
+@Entity
+@Table(name = "address")
+public class Address{
+    //create all the fields, getters and setters.
+}
+
+public class AddressResponse{
+    //copy all the fields, getters and setters from Address class.
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Create an interface AddressRepository that extends JPARepository<Address, Integer>
+
+public interface AddressRepository extends JPARepository<Address, Integer>{
+    @Query(nativeQuery = true, value = "Select a.id, a.lane, e.id, e.name from employee e, address a where e.id = a.empId and a.empId =: employeeId")
+    Address address = findAddressById(@Param("employeeId") String empId)
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Create a service class:
+
+@Service
+public class AddressService{
+
+    @Autowired
+    AddressRepository repository;
+
+    @Autowired
+    ModelMapper mapper;   // 3rd party API, add dependency in pom.xml. Create a bean for Model Mapper class in config class
+
+    public AddressResponse getAddressOfEmp(Integer empId){
+        Address address =  repository.findAddressById(empId);
+
+        // map the Address to AddressResponse using a model mapper;
+        AddressResponse addressResponse = mapper.map(address, AddressResponse.class);
+        return addressResponse;
+    }
+
+    public List<AddressResponse> getAllAddressOfEmployees(){
+        List<Address> list = repository.findAll();
+
+        List<AddressResponse> addressList = Arrays.asList(mapper.map(list, AddressResponse[].class));
+
+        return addressList;
+    }
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Create AdressController class:
+
+@RestController
+public class AddressController{
+    @Autowired
+    private AddressService service;
+
+    @GetMapping("/address")
+    public ResponseEntity<List<AddressResponse>> getAllAddress(){
+       List<AddressResponse> list = service.getAllAddressOfEmployees();
+
+       return ResponseEntity().status(HttpStatus.OK).body(list); 
+    }
+
+    @GetMapping("/address/{empId}")
+    public ResponseEntity<AddressResponse> getAddressOfEmployee(@PathVariable("empId") Integer id){
+        AddressResponse res = service.getAddressOfEmp(id);
+
+        return ResponseEntity().status(HttpStatus.OK).body(res);
+    }
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+EUREKA DISCOVERY SERVICE:
+
+Add spring-cloud-starter-netflix-eureka-client in pom.xml of Employee and Address modules to make themselves clients for discovery server
+eureka-client dependency adds spring-cloud-starter-loadbalancer. SO we dont need to add that dependency implicitly.
+
+Add in address-app and employee-app modules pom.xml:
+
+eureka.client.service-url.defaultZone=http://localhost:5000/eureka/
+
+Create a new Module: discovery-service. Inside main class:
+
+public class DiscoveryServiceApplication{
+    @SpringBootApplication
+    @EnableEurekaServer                               -->    Enable eureka discovery service
+    public static void main(String[] args){
+        SpringApplication.run(DiscoveryServiceApplication.class, args);
+    }
+}
+
+@EnableEurekaServer annotation creates a bean "Marker" & puts in app context. When this app runs, the "EurekaServerAutoConfiguration" class runs
+and configures the eureka server for us. This class is run when "Marker" bean is available. It checks for the Marker bean by @ConditionalOnBean() annotation.
+This class implements WebMvcConfigurer. The first time the app is run, this class creates the Marker bean.
+
+Inside application.properties
+
+server.port=5000
+spring.application.name=discovery-service
+eureka.client.fetch-registry=false          // when we run the app, it should not look for other discovery services
+eureka.client.register-with-eureka=false             // This is to exclude the current module(discovery-service) from eureka discovery server.
+eureka.instance.hostname=localhost
+eureka.client.service-url.defaultZone=http://localhost:5000/eureka/
+
+We dont want to include discovery-service app in the eureka server page. So we exclude it by "eureka.client.register-with-eureka=false".
+We dont want to track the I.P, port of discovery-service.
+
+Clients are registered with eureka server. We can track the clients info like IP, port, no if instances running running, status etc in the eureka server.
+Eureka clients send heartbeats to eureka server every 30 sec(can be changed) to denote the status of the clients. Eureka server removes a client if it didnt
+receive a heartbeat from a client for 90 sec.
+
+If you want to set the heartbeat interval, use eureka.client.lease-renewal-interval-in-seconds property in clients (default 30 sec)
+To set the expiration interval of a service: eureka.client.lease-expiration-duration-in-seconds (default 90 sec).
+
+When a client app(Employee or Address) starts, it fetches all the data from eureka server registry from "http://localhost:5000/eureka/apps" an caches it. 
+If more instances are registered afterwards, the client can fetch those instances in every heartbeat by calling endpoint "http://localhost:5000/eureka/apps/delta"
+
+The call to apps/delta will return those instances which are not fetched by the client in previous call
+
+When a service is started:     (This can be checked using TCP/IP monitor in IDE)
+
+1. GET request to ...eureka/apps         --> No app is running initially 
+2. POST request to ...eureka/apps/module_name  (ADDRESS-SERVICE OR EMPLOYEE-SERVICE). The module will register itself and posts all the info about itself
+3. GET request to ...eureka/apps         --> 1 app is running(itself)
+4. PUT request ...eureka/apps/module_name/ip:module_name:port?status=IP....       --> heartbeat
+5. GET request ... eureka/apps/delta     --> fetch if any new instance running  

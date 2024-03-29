@@ -1,0 +1,417 @@
+* First level cache
+Hibernate’s session cache is also referred to as the first-level cache. The session cache is a cache within a database session’s scope.
+The first level cache minimizes database access for the same object. For example, if you call the get() method to access Employee object with id = 1 from one session, 
+it will go to the database and load the object into memory, but it will also cache the object in the first-level cache.
+When you call the same method on same object from same session, the objecct will be returned from the cache without accessing the database.
+
+This first-level cache greatly improves the performance of Java applications by minimizing database roundtrips and executing fewer queries. For example, if an 
+object is modified several times within the same transaction, then Hibernate will only generate one SQL UPDATE statement at the end of the transaction, containing 
+all the modifications.
+
+Advantages of 1st level cache:
+1. Performance:  By caching entities within a session, Hibernate can avoid querying the database repeatedly for the same data.
+
+2. Consistency:  Any changes made to entities are visible only within the same session. Other sessions cant see those changes until they are committed to db.
+
+3. Automatic:  built into Hibernate and is automatically managed by the framework.
+
+Disadvantages:
+1. Memory Consumption: It can consume a significant amount of memory, especially for applications that handle large amounts of data.
+
+2. Stale Data: Since it only caches data for the current session, it will not reflect any changes made to the same entity by other sessions or applications.
+
+3. Limited Scope: Tt is not effective in reducing db queries in scenarios where the same data is accessed across multiple sessions or transactions.
+
+Or you can use 1st level cache by adding @Cacheable on top of the entity class.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Second/Process Level cache
+The second-level cache is maintained at the SessionFactory level, which is used to open sessions, hence every session is linked to SessionFactory. This cache is 
+opposite to first level cache which is by default enabled in Hibernate, this one is by default disabled and you need to configure the second level cache in 
+Hibernate configuration file to enable it.
+
+The second-level cache is provided with the help of caching providers e.g EhCache and OSCache. Once configured, every request for an object will go to the second 
+level cache if it is not found in the first level cache. It wont hit the database without consulting second-level cache, which means improved performance.
+
+If the object we are querying is not found in 1st level cache, then the 2nd level cache is hit. 2nd level cache is a key-value store. It only works if we query 
+entities based on ids. If lookup looks like this: "from Authors where name = :name", then you dont hit cache.
+
+You can configure 2nd level cache in hibernate.cfg.xml:
+    <property name="cache.use_second_level_cache">true</property>
+    <prop key="hibernate.cache.provider_class">org.hibernate.cache.EhCacheProvider</prop>
+
+The 2nd level cache works on temporal locality & spatial locality principles. Temporal locality = If an object is queried, it is likely to be queried again.
+Spatial locality = The objects in proximity to each other is cache will be queried together.
+
+You can also use JPA Annotation @Cacheable to specify which entity is cacheable. and Hibernate annotations @Cache to specify caching strategy like 
+CacheConcurrencyStrategies like READ_WRITE or READ_ONLY to tell Hibernate how the second level cache should behave.
+
+The query cache stores just the list of IDs of the object and those Objects w.r.t their IDs are stored in the 2nd level cache. So if we enable query cache, 
+we will utilize the same resource. Query cache is best when the data is static & retrieved from a relational db.
+Query cache does not cache the state of actual entities in the result set but it only stores the identifier values and results of the value type. Hence, query 
+cache should be always used in association with second-level cache.
+
+You can configure Query cache in hibernate.cfg.xml:
+    <property name="hibernate.cache.use_query_cache">true</property>
+
+    Query query = session.createQuery("FROM Person WHERE name = :name"); 
+    query.setParameter("name", "John"); 
+    query.setCacheable(true);                  // Use the cache
+    List<Person> results = query.list();
+
+Hibernate actually has four different cache strategies:
+
+1. READ_ONLY: Objects don’t change once inside the cache.
+
+2. NONSTRICT_READ_WRITE: Objects change (eventually) after the corresponding database entry is updated; this guarantees eventual consistency.
+
+3. READ_WRITE: Objects change (immediately) after the corresponding database entry is updated; this guarantees strong consistency by using "soft" locks.
+
+4. TRANSACTIONAL: Objects change using distributed XA transactions, ensuring data integrity; this guarantees either total success or rolling back all changes. 
+In all four of these cases, though, updating a single database entry would not invalidate the entire list of customers in the cache. Hibernate is a little 
+smarter than that.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Difference between First and Second Level Cache in Hibernate
+
+                                    FIRST LEVEL                         |                      SECOND LEVEL CACHE
+1. The first level cache is associated with the "Session" Object. This  |   Second-level cache is associated with the "SessionFactory" object. This cache scope
+   means this cache scope is limited to session                         |   is at the application level
+
+2. The first level cache is by default enabled in Hibernate             |   Second level cache is optional. Explicitly enable this is hibernate.cfg.xml
+
+3. First level cache is available only until the session is open, once  |   Second-level cache is available through the applications life-cycle, it is 
+   the session is closed, the first level cache is destroyed            |     only destroyed and recreated when you restart your application.
+    
+4. This is implemented using internal hashmaps                          |    This is implemented using 3rd party providers like EhCache/OSCache
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Difference between get and load in Hibernate 
+
+Hibernate Session class provides two methods to access object e.g. session.get() and session.load().
+
+                                    get()                               |                      load()
+1. Returns fully initialized object which may involve several db calls  |   Returns proxy in place and only initialize the object or hit the db if any method other 
+                                                                        |  than getId()(or any identifier method) is called on persistent object
+
+2. Returns null if an object is not found in the cache or db            |   throws "ObjectNotFoundException" if the object is not found in cache/db
+
+3. Get method always hit the database                                   |   load() method may not always hit the db, depending upon which method is called.
+
+4. Use this method if unsure whether the object in db exists or not     |   Use this method if sure that the object in db exists(if not, then Exc is thrown)
+
+load() method of Hibernate can return a proxy(object with ID but without initializing other properties), which is lazily initialized which can be 
+initialized on demand (lazy initialization) when a non-identifier method is accessed.
+
+The proxy objects will throw ObjectNotFoundException later if the corresponding row doesn’t exist in the database, instead of failing immediately so not a fail 
+fast behavior.
+
+Session session = SessionFactory.getCurrentSession();      //Example of calling get method of Hibernate Session class
+Employee Employee = (Employee) session.get(Employee.class, EmployeeID);
+
+Session session = SessionFactory.getCurrentSession();       //Example of calling load method of Hibernate Session
+Employee Employee = (Employee) session.load(Employee.class, EmployeeID);
+
+NOTE: In a new session, if a persistent object is queried by load() method, the proxy object will be cached in the cache. If the get() method is called on same
+object int the same session, the proxy object is returned from the cache. This way get() method can return a proxy without hitting db
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Difference between save vs persist and saveOrUpdate in Hibernate 
+
+Hibernate Session class provides a couple of ways to save an object into the database by methods like save, saveOrUpdate, and persist
+
+                                    save()                              |                      saveOrUpdate()
+1. Generates an identifier & returns this Serializable identifier after |   Return type is void.
+    inserting the record in the db.                                     |  
+
+2. Inserts the record if not exists or fails if exists                  |   Inserts OR updates the records if exists.
+
+3. Converts the transient state of an object to persistent              |   Converts the transient/detached state of an object to persistent.
+
+persist() and save() both methods make a transient instance persistent. However, persist() method doesn't guarantee that the identifier value will be assigned 
+to the persistent instance immediately, the assignment might happen at flush time. 
+
+persist() method guarantees that it will not execute an INSERT statement if it is called outside of transaction boundaries.
+save() method does not guarantee the same, it returns an identifier, and if an INSERT has to be executed to get the identifier (like "identity" generator), 
+this INSERT happens immediately, no matter if you are inside or outside of a transaction.
+
+persist() is useful in long-running conversations with an extended Session context. On the other hand, the save() method is not good in a long-running conversation 
+with an extended Session context.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Difference between Transient vs Persistent vs Detached Object in Hibernate
+
+The detached object was associated with Hibernate session in past and it has representation in the database, on the other hand, the Transient object is never 
+associated with hibernate and it doesn't have any representation in the database.
+Both can be moved to Persistent state by associating them with session e.g. you can move an entity from transient to persistent state by calling Session.save().
+
+Similarly, you can move a detached entity to Persistent state by calling Session.update() or Session.saveOrUpdate(), or Session.merge() methods.
+
+1. Database Representation
+When an entity is first created, it goes to transient state and this time it doesn't have a representation in the database i.e. there will be no row corresponding 
+to this object in Entity table. On the other hand, both Persistent and Detached objects have corresponding representation in the database.
+
+2. Association with Hibernate
+The transient object is not associated with the session, hibernate knows nothing about them. Similarly, the detached object is also not associated with the session, 
+but a Persistent object is associated with the session.
+
+3. Impact of GC
+Both transient and detached objects are eligible for garbage collection because they are not associated with the session, when GC will run they can be collected, 
+but the persistent object is not eligible to garbage collection until the session is open because Hibernate Session object keeps a reference of Persistent object.
+
+4. State transition
+When an entity is first created in an application using the new() operator, it remains in transient state. It can move to a Persistent state when you associate 
+it with a session by calling Session.save() method. When you close() the session or evict() that object from session, it moves to a detached state.
+
+Why JPA Entity or Hibernate Persistence Class Should Not be Final?
+The use of proxies is the core feature of Hibernate for implementing key performance features e.g. lazy loading and lazy associations fetching. In order to 
+use a proxy in place of a real class, your hibernate persistence class must be either non-final or the implementation of an interface that declares all of the 
+public methods. 
+
+When you call session.load() method, it will return a proxy object. You will not see any SQL queries fired by the hibernate.
+Customer customer = (Customer) session.load(Customer.class, 1L);
+logger.info(customer.getClass());   // prints "sample.hibernate.Customer_$$_javassist_0" which is a JavaAssist generated proxy.
+
+Now, if you make the class final and reprint the name of the class, you will see the actual name of the class as "Customer". You will also see the select queries fired 
+by hibernate to initialize the object.
+Hibernate doesn't create a proxy for the final class, instead they use the real class, but Hibernate does create a proxy for a non-final class with final methods.
+
+As per Hibernate documentation, if you're going to make a class final you should explicitly disable proxy generation by adding @Proxy(lazy=false). 
+You should also disable proxy generation if you're going to make any public methods final in persistent class, as hibernate will not be able to override them
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Difference between getCurrentSession() and openSession() in Hibernate
+
+                        getCurrentSession()                             |                      openSession()
+1. This method returns the session bound to the context.                |   This method always opens a new session.
+
+2. This session object scope belongs to the hibernate context and to    |   A new session object has to be created for each request in a multi-threaded environment. 
+   make this work, hibernate configuration file has to be modified by   |   Hence, you need not configure any property to call this method.
+   adding <property name = "hibernate.current_session_context_class">   |
+   thread</property>. If not added, then using the method would throw   |
+   an HibernateException.
+
+3. This session object gets closed once the session factory is closed.  |   It's the developer’s responsibility to close this object once all the database 
+                                                                        |   operations are done.
+ 
+4. In a single-threaded environment, this method is faster than         |   In single threaded environment, it is slower than getCurrentSession().  
+   openSession().              
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Hibernate Inheritance Mapping
+Relational databases don’t have a straightforward way to map class hierarchies onto database tables.
+
+To address this, the JPA specification provides several strategies:
+
+    - MappedSuperclass – the parent classes, can’t be entities
+    - Single Table – The entities from different classes with a common ancestor are placed in a single table.
+    - Joined Table – Each class has its table, and querying a subclass entity requires joining the tables.
+    - Table per Class – All the properties of a class are in its table, so no join is required.
+
+1. MappedSuperclass: Using the MappedSuperclass strategy, inheritance is only evident in the class but not the entity model.
+
+@MappedSuperclass
+public class Person {
+    @Id
+    private long personId;
+    private String name;
+
+}
+Notice that this class no longer has an @Entity annotation, as it won’t be persisted in the database by itself.
+
+@Entity
+public class MyEmployee extends Person {
+    private String company;
+    // constructor, getters, setters 
+}
+
+In the database, this will correspond to one MyEmployee table with three columns for the declared and inherited fields of the subclass.
+If we’re using this strategy, ancestors cannot contain associations with other entities.
+
+2. Single Table: creates one table for each class hierarchy. JPA also chooses this strategy by default if we don’t specify one explicitly.
+Here, the inheritance data hierarchy is stored in the single table by making use of a discriminator column which determines to what class the record belongs.
+
+This means the parent & child entities are discriminated by a separate column in the db.
+
+@Entity(name="products")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name="product_type",       discriminatorType = DiscriminatorType.INTEGER)
+@DiscriminatorValue("1")    // we could have used @DiscriminatorValue(“null”)
+public class MyProduct {
+    @Id
+    private long productId;
+    private String name;
+
+}
+
+@Entity                                             |        @Entity
+@DiscriminatorValue("1")                            |        @DiscriminatorValue("2")
+public class Book extends MyProduct {               |        public class Pen extends MyProduct {
+    private String author;                          |           private String color;
+}                                                   |        }
+
+Since the records for all entities will be in the same table, Hibernate needs a way to differentiate between them.
+By default, this is done through a discriminator column called DTYPE that has the name of the entity as a value.
+
+Hibernate adds two other predefined values that the annotation can take — null and not null:
+
+- @DiscriminatorValue(“null”) means that any row without a discriminator value will be mapped to the entity class with this annotation; this can be applied to the 
+root class of the hierarchy.
+
+- @DiscriminatorValue(“not null”) – Any row with a discriminator value not matching any of the ones associated with entity definitions will be mapped to the class with 
+this annotation.
+
+- @DiscriminatorFormula("case when author is not null then 1 else 2 end")
+
+This creates a table in the db named = "products" with 5 columns
+productId   |   name   |    author   |   color   |     product_type
+-------------------------------------------------------------------
+1           |   Oil    |    Fortune  |   Null    |      0    // entity belongs to Root(MyProduct) class
+2           | Ball pen |   Reynolds  |   Black   |      2    // entity belongs to Child(Pen) class
+3           |   DSA    |    Cormen   |   White   |      1    // entity belongs to Child(Book) class
+
+3. Joined Table: Using this strategy, each class in the hierarchy is mapped to its table. The only column that repeatedly appears in all the tables is the identifier, 
+which will be used for joining them when needed
+
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
+public class Animal {
+    @Id
+    private long animalId;
+    private String species;
+}
+
+@Entity
+@PrimaryKeyJoinColumn(name = "petId")
+public class Pet extends Animal {
+    private String name;
+}
+
+Both tables will have an "animalId" identifier column. The primary key of the Pet entity also has a foreign key constraint to the primary key of its parent entity.
+The disadvantage of this inheritance mapping method is that retrieving entities requires joins between tables, which can result in lower performance for large 
+numbers of records.
+
+The number of joins is higher when querying the parent class because it will join with every single related child — so performance is more likely to be affected 
+the higher up the hierarchy we want to retrieve records.
+
+4. Table per Class:  Each class in the hierarchy has a corresponding mapping db table.
+
+@Entity(name = "interviewbit_employee")
+@Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
+public class Employee {
+   @Id
+   @Column(name = "employee_id")
+   private String employeeId;
+   private String fullName;
+   private String email;
+}
+
+@Entity                                                  |        @Entity
+public class ContractEmployee extends Employee {         |        public class PermanentEmployee extends Employee {
+   private LocalDate contractStartDate;                  |            private LocalDate workStartDate;
+   private LocalDate contractEndDate;                    |            private int numberOfLeaves;
+   private String agencyName;                            |        }   
+}                                                        |        
+
+This will create 3 tables for Employee, ContractEmployee, PermanentEmployee. This type of strategy offers less performance due to the need for additional joins to 
+get the data. This strategy is not supported by all JPA providers. Ordering is tricky in some cases since it is done based on a class and later by the ordering criteria.
+The distinction is clear when querying the base class, which will return all the subclass records as well by using a UNION statement in the background.
+
+Querying a base class will retrieve all the subclass entities as well.
+
+@Test
+public void givenSubclasses_whenQuerySingleTableSuperclass_thenOk() {
+    Book book = new Book(1, "1984", "George Orwell");   // child class of MyProduct
+    session.save(book);
+    Pen pen = new Pen(2, "my pen", "blue");             // child class of MyProduct
+    session.save(pen);
+
+    assertThat(session.createQuery("from MyProduct").getResultList().size()).isEqualTo(2);
+}   // querying the superclass will return the child class records as well
+
+Hibernate can also query interfaces or base classes that are not entities but are extended or implemented by entity classes.
+
+@Test
+public void givenSubclasses_whenQueryMappedSuperclass_thenOk() {
+    MyEmployee emp = new MyEmployee(1, "john", "baeldung");
+    session.save(emp);
+
+    assertThat(session.createQuery("from com.baeldung.hibernate.pojo.inheritance.Person")  // use fully qualified name
+                      .getResultList()).hasSize(1);
+}
+
+This also works for any superclass or interface, whether it’s a @MappedSuperclass or not. The difference from a usual HQL query is that we have to use the fully 
+qualified name since they(superclass or interface) are not Hibernate-managed entities.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Mapping A Hibernate Query to a Custom Class:
+
+When we use Hibernate to retrieve data from the database, by default, it uses the retrieved data to construct the whole object graph for the object requested. 
+But sometimes we might want to retrieve only part of the data, preferably in a flat structure.
+
+@Entity
+public class DeptEmployee {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private long id;
+
+    private String name;
+
+    @ManyToOne
+    private Department department;
+} 
+
+@Entity
+public class Department {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private long id;
+
+    private String name;
+
+    @OneToMany(mappedBy="department")
+    private List<DeptEmployee> employees;
+}
+
+Query<DeptEmployee> query = session.createQuery("from DeptEmployee");
+List<DeptEmployee> deptEmployees = query.list();
+
+The above query will return all the fields of the DeptEmployee entity. But if we want to return only specific fields:
+We can do that by specifying the column names in the SQL query. OR
+
+We can create a POJO class that contains only the specific fields from the DeptEmployee class.
+public class Result {
+    private String employeeName; 
+    private String departmentName;
+    
+    public Result(String employeeName, String departmentName) {
+        this.employeeName = employeeName;
+        this.departmentName = departmentName;
+    }
+
+    public Result() {}
+
+    // getters and setters 
+}
+
+Query<Result> query = session.createQuery("select new com.baeldung.hibernate.pojo.Result(m.name, m.department.name)" 
+  + " from com.baeldung.hibernate.entities.DeptEmployee m");
+List<Result> results = query.list();
+Result result = results.get(0);
+
+Here, we use the constructor we defined in the Result class along with the properties we want to retrieve. This will return a list of Result objects with the data 
+populated from the columns. It’s important to note that we have to use the fully qualified name of the class in the query.
+
+An alternative to using a constructor in the HQL query is to use a ResultTransformer
+
+Query query = session.createQuery("select m.name as employeeName, m.department.name as departmentName" 
+  + " from com.baeldung.hibernate.entities.DeptEmployee m");
+query.setResultTransformer(Transformers.aliasToBean(Result.class));
+List<Result> results = query.list();
+Result result = results.get(0);

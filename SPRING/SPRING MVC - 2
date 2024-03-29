@@ -1,0 +1,283 @@
+@ModelAttribute Annotation:
+
+@ModelAttribute is an annotation that binds a method parameter or method return value to a named model attribute, and then exposes it to a web view.
+This means, a method annotated by @ModelAttribute will bind the return value of that method to an attribute of the model.  For ex, if we have a form with a form backing 
+object that is called “Student” then we can have Spring MVC supply this object to a Controller method by using the @ModelAttribute annotation:
+
+    @RequestMapping("/home")
+    public String showHomePage(@ModelAttribute("studentInfo") StudentInfoDTO studentInfoDTO) {
+            return "something";
+    }
+
+Is similar to @RequestBody, we can set attributes of HTML(jsp) files using @ModelAttribute. Difference is that @RequestBody is used for binding data from whole body of 
+the request like POST,PUT.. request types which contains other format like json, xml but @ModelAttribute is used for binding data from request param(in key value pairs)
+We can use @ModelAttribute either as a method parameter or at the method level.
+
+@ModelAttribute is basically used when you want to include multipart files as the body. To pass data from the front end you need to convert the data to JSON.
+I have used this in project "whiteboard" backend in UploadController class "uploadFile()" method for uploading an image(multipart file)
+
+When we use the annotation at the method level, it indicates the purpose of the method is to add one or more model attributes. Such methods support the 
+same argument types as @RequestMapping methods, but they can’t be mapped directly to requests.
+
+@ModelAttribute
+public void addAttributes(Model model) {
+    model.addAttribute("msg", "Welcome to the Netherlands!");
+}
+
+In the above example, we see a method that adds an attribute named "msg" to all models defined in the controller class.
+
+In general, Spring MVC will always make a call to that method first, before it calls any request handler methods. Basically, @ModelAttribute methods are 
+invoked before the controller methods annotated with @RequestMapping are invoked. This is because the model object has to be created before any processing 
+starts inside the controller methods.
+
+It’s also important that we annotate the respective class as @ControllerAdvice. Thus, we can add values in Model that’ll be identified as global. This actually 
+means that for every request, a default value exists for every method in the response.
+
+As a method parameter:
+
+@RequestMapping(value = "/addEmployee", method = RequestMethod.POST)
+public String submit(@ModelAttribute("employeeModel") Employee employee) {
+    // Code that uses the employee object
+
+    return "employeeView";
+}
+
+In this method, A form data (Employee object) submitted on path = "/addEmployee" is used to populate the "employeeModel" attribute of a model.
+Spring MVC does this behind the scenes before invoking the submit method
+
+It binds the form data with a bean. The controller annotated with @RequestMapping can have custom class argument(s) annotated with @ModelAttribute.
+In Spring MVC, we refer to this as data binding, a common mechanism that saves us from having to parse each form field individually.
+
+@ModelAttribute is basically used when you want to include multipart files as the body. To pass data from the front end you need to convert the data to JSON.
+
+@ModelAttribute and @RequestBody both are having same use, only difference is @ModelAttribute use for normal spring MVC and @RequestBody use for REST web service. 
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+FORM EXAMPLE:
+
+The View, create a simple HTML form:
+
+<form:form method="POST" action="/spring-mvc-basics/addEmployee" modelAttribute="employee">
+    <form:label path="name">Name</form:label>
+    <form:input path="name" />
+    
+    <form:label path="id">Id</form:label>
+    <form:input path="id" />
+    
+    <input type="submit" value="Submit" />
+</form:form>
+
+Controller:
+
+@Controller
+@ControllerAdvice
+public class EmployeeController {
+
+    private Map<Long, Employee> employeeMap = new HashMap<>();
+
+    @RequestMapping(value = "/addEmployee", method = RequestMethod.POST)
+    public String submit(@ModelAttribute("employee") Employee employee,        --> Method param @ModelAttribute
+                         BindingResult result, ModelMap model) {
+        if (result.hasErrors()) {
+            return "error";
+        }
+        model.addAttribute("name", employee.getName());
+        model.addAttribute("id", employee.getId());
+
+        employeeMap.put(employee.getId(), employee);
+
+        return "employeeView";
+    }
+
+    @ModelAttribute                                         --> Method level @ModelAttribute
+    public void addAttributes(Model model) {
+        model.addAttribute("msg", "Welcome to the Netherlands!");
+    }
+}
+
+In the submit() method, we have an Employee object bound to our View. In the method, we’re fetching values from the form and setting them to ModelMap.
+
+In the end, we return employeeView, which means that we call the respective JSP file as a View representative.
+
+Furthermore, there’s also an addAttributes() method. Its purpose is to add values in the Model that’ll be identified globally. 
+That is, every request to every controller method will return a default value as a response. We also have to annotate the specific class as @ControllerAdvice.
+
+Model:
+The Model object is very simple and contains all that the “front-end” attributes require. 
+
+@XmlRootElement
+public class Employee {
+
+    private long id;
+    private String name;
+
+    public Employee(long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    // standard getters and setters removed
+}
+
+@ControllerAdvice assists a controller, and in particular, @ModelAttribute methods that apply to all @RequestMapping methods. Of course, our addAttributes() 
+method will be the very first to run, prior to the rest of the @RequestMapping methods.
+
+Keeping that in mind, and after both submit() and addAttributes() are run, we can refer to them in the View returned from the Controller class by mentioning 
+their given name inside a dollarized curly-braces duo, like ${name}.
+
+<h3>${msg}</h3>
+Name : ${name}
+ID : ${id}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+SESSION ATTRIBUTES:
+
+Sometimes we have some attributes that needs to be displayed on multiple pages in a web application. A good location to store those attributes is in the user’s session.
+
+EXAMPLE: We are creating a "TODO" application. We will create "TodoItem" from a form. After creating a TodoItem, its data will be displayed on
+the form next time when we create a TodoItem.  It will be like placeholder data for the form.
+
+Two Model classes as POJO:
+
+public class TodoItem {
+
+    private String description;
+    private LocalDateTime createDate;
+
+    // getters and setters
+}
+
+public class TodoList extends ArrayDeque<TodoItem>{
+}
+
+Our TodoList class extends ArrayDeque to give us convenient access to the most recently added item via the peekLast method.
+
+We will need 2 controller classes, 1 for TodoItem and 1 for TodoList class 
+
+@GetMapping(“/form”) – This method will be responsible for initializing the form and rendering the form view. The method will prepopulate the form with the most 
+recently added TodoItem if the TodoList is not empty.
+@PostMapping(“/form”) – This method will be responsible for adding the submitted TodoItem to the TodoList and redirecting to the list URL
+
+@GetMapping(“/todos.html”) – This method will simply add the TodoList to the Model for display and render the list view.
+
+Using a Scoped Proxy:
+
+In this, our TodoList is configured as a session-scoped @Bean that is backed by a proxy. The fact that the @Bean is a proxy means that we are able to 
+inject it into our singleton-scoped @Controller.
+
+Since there is no session when the context initializes, Spring will create a proxy of TodoList to inject as a dependency. The target instance of TodoList 
+will be instantiated as needed when required by requests.
+
+@Bean
+@Scope(
+  value = WebApplicationContext.SCOPE_SESSION, 
+  proxyMode = ScopedProxyMode.TARGET_CLASS)
+public TodoList todos() {
+    return new TodoList();
+}
+
+Inject TodoList Bean as a dependency in the Controller class:
+
+@Controller
+@RequestMapping("/scopedproxy")
+public class TodoControllerWithScopedProxy {
+
+    private TodoList todos;         --> Bean 
+
+    @GetMapping("/form")
+    public String showForm(Model model) {
+        if (!todos.isEmpty()) {
+            model.addAttribute("todo", todos.peekLast());
+        } else {
+            model.addAttribute("todo", new TodoItem());
+        }
+        return "scopedproxyform";
+    }
+}
+
+Controllers have singleton scope by default. This is the reason why we must use a proxy instead of simply injecting a non-proxied session-scoped bean. 
+We can’t inject a bean with a lesser scope into a bean with greater scope. Otherwise it will give an error: Scope ‘session’ is not active for the current thread.
+
+If the controller itself is defined using session scope, we could avoid proxyMode. But it will be expensive as we have to create a controller instance for each 
+session. 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+In the prev ex, The TodoList bean is available to other components for injection. If we want "TodoList" to be available only for the Controller class,
+we should have gone for @SesssionAttributes. That way "TodoList" instance would be scoped to controller instead of entire app.
+
+In this ex, we dont define "TodoList" as spring managed bean. We declare it as @ModelAttribute & specify the @SesssionAttributes annotation 
+to scope it to the session for the controller.
+
+The first time our controller is accessed, Spring will instantiate an instance and place it in the Model. Since we also declare the bean in @SessionAttributes, 
+Spring will store the instance.
+
+First, we declare our bean by providing a method on the controller and we annotate the method with @ModelAttribute:
+
+@ModelAttribute("todoList")
+public TodoList todoList() {             --> Bean
+    return new TodoList();
+}
+
+Next, we inform the controller to treat our TodoList as session-scoped by using @SessionAttributes:
+
+@Controller
+@RequestMapping("/sessionattributes")
+@SessionAttributes("todoList")               --> "TodoList" will be session scoped to TodoControllerWithSessionAttributes class
+public class TodoControllerWithSessionAttributes {
+    // ... other methods
+}
+
+To use the bean within a request, we provide a reference to it in the method signature of a @RequestMapping:
+
+@GetMapping("/form")
+public String showForm(Model model, @ModelAttribute("todoList") TodoList todos) {
+ 
+    if (!todos.isEmpty()) {
+        model.addAttribute("todo", todos.peekLast());
+    } else {
+        model.addAttribute("todo", new TodoItem());
+    }
+    return "sessionattributesform";
+}
+
+In the @PostMapping method, we inject RedirectAttributes and call addFlashAttribute before returning our RedirectView. This is an important 
+difference in implementation compared to our first example:
+
+@PostMapping("/form")
+public RedirectView create(@ModelAttribute TodoItem todo, 
+                           @ModelAttribute("todoList") TodoList todos, 
+                           RedirectAttributes attributes) {
+    todo.setCreateDate(LocalDateTime.now());
+    todos.add(todo);
+    attributes.addFlashAttribute("todos", todos);
+    return new RedirectView("/sessionattributes/todos.html");
+}
+
+Spring uses a specialized RedirectAttributes implementation of Model for redirect scenarios to support the encoding of URL parameters. During a redirect, 
+any attributes stored on the Model would normally only be available to the framework if they were included in the URL.
+
+By using addFlashAttribute we are telling the framework that we want our TodoList to survive the redirect without needing to encode it in the URL.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+@ModelAttribute: This annotation is used to bind request parameters (either in the query string or in the form data) to method parameters or model attributes. It is 
+commonly used with HTML forms or when you want to extract individual parameters from the request.
+
+    @PostMapping("/example")
+    public ResponseEntity<String> handleRequest(@ModelAttribute("name") String name, @ModelAttribute("age") int age) {
+        // Do something with the name and age parameters
+        return ResponseEntity.ok("Request handled successfully");
+    }
+
+@RequestBody: This annotation is used to bind the entire request body to a method parameter. It is typically used when the request payload is in JSON or XML format.
+
+    @PostMapping("/example")
+    public ResponseEntity<String> handleRequest(@RequestBody ExampleDto exampleDto) {
+        // Do something with the exampleDto object
+        return ResponseEntity.ok("Request handled successfully");
+    }
+
+@ModelAttribute is used with traditional HTML views where we want to populate our models. @RequestBody is used with RESTful web services where we serve responses
+in JSON, XML etc. to client(JS frontend)

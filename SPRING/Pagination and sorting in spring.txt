@@ -1,0 +1,179 @@
+ADD PAGINATION SUPPORT IN:
+
+1. Modify Service interface:
+
+List<PostDto> getAllPost(int pageNo, int pageSize);
+
+Modify ServiceImpl class:
+
+@Override
+public List<PostDto> getAllPost(int pageNo, int pageSize) {
+    Pageable pageable = PageRequest.of(pageNo, pageSize);
+    Page<Post> postList = postRepository.findAll(pageable);
+
+    List<Post> listOfPost = postList.getContent();
+}
+
+The Pageable interface in the context of pagination and sorting is a part of the Spring Data framework. It's used to represent information regarding 
+pagination and sorting criteria for queries, enabling the retrieval of data in manageable chunks and in a specified order.
+
+"Pageable" encapsulates data that defines how data should be paginated. It holds information like the page number, number of items per page (page size), 
+and other optional details.
+
+Query Methods: When used as a method parameter in Spring Data repository methods, Pageable helps in retrieving a specific "page" of data, allowing 
+applications to fetch a limited amount of data based on the given page number and size.
+
+The Page interface extends Slice and represents a page of data along with some additional pagination information. It's typically used to retrieve a specific 
+"page" of results and to provide insights into the available data such as the total number of pages, total elements, etc.
+
+Page encapsulates the data fetched based on the pagination information provided by Pageable. It includes the actual content for the current page along with 
+metadata like the total number of pages, the total number of elements, and more.
+
+The Page interface provides the total number of elements in the dataset, which can be useful for creating pagination controls in a user interface.
+Page offers methods for navigating through the data, iterating over the content, and extracting information about the current page.
+
+2. Modify Controller class:
+
+@GetMapping
+ public ResponseEntity<List<PostDto>> getAllPost(
+  @RequestParam(value = "pageNo", defaultValue = "0", required = false) int pageNo,   
+  @RequestParam(value = "pageSize", defaultValue = "10", required = false) int pageSize
+ ) {
+      return new ResponseEntity<>(postService.getAllPost(pageNo, pageSize), HttpStatus.OK);
+ }
+
+@RequestParam are query params passed in the url after "?".
+Ex: localhost:8080/api/v1/posts?pageNo=0&pageSize=10&...
+the key of the query param ("pageNo", "pageSize") should match the "value" in the @RequestParam annotation.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+CUSTOMIZING PAGINATION API RESPONSE:
+
+1. Create a class called PostResponse:
+
+The PostResponse class encapsulates and organizes the paginated data and its metadata, providing a structured format for returning paginated content. It serves
+as a wrapper that includes both the paginated content and essential information about the pagination process. Below are the reasons for its need in pagination:
+
+It holds the actual content(List<PostDTO>) for the specific page.
+It includes pagination related metadata lik: 
+    pageNo -- > Indicates the current page number.
+    pageSize -->  Specifies the number of elements per page.
+    totalElements --> Represents the total count of elements in the dataset. 
+    totalPages --> Shows the total number of pages.
+    last (boolean) --> Identifies if it's the last page.
+
+Benefits and Use Cases:
+Standardized response:
+    PostResponse provides a consistent structure to return paginated data along with necessary pagination metadata. This standardized format makes it easier 
+    for consuming services or clients to interpret the paginated response.
+
+    Easier Consumption: It simplifies the handling of paginated data on the client-side, providing direct access to both the content and metadata without needing 
+    to parse separate response components.
+
+    Enhanced Information: The metadata within PostResponse (such as total elements, total pages, etc.) is crucial for clients to understand and navigate paginated 
+    data efficiently.
+
+    Facilitates Client-Side Navigation: The information within PostResponse can assist in building user interfaces, especially when creating navigation controls for 
+    users to move between pages.
+
+public class PostResponse {     --> PostResponse class to consume paginated data
+
+    private List<PostDto> content;
+
+    private int pageNo;
+
+    private int pageSize;
+
+    private long totalElements;
+
+    private int totalPages;
+
+    private boolean last;
+}
+
+2. Add PostResponse in PostService interface:
+
+ PostResponse getAllPost(int pageNo, int pageSize);
+
+Modify PostServiceImpl class:
+
+@Override
+ public PostResponse getAllPost(int pageNo, int pageSize) {
+    Pageable pageable = PageRequest.of(pageNo, pageSize);
+
+    Page<Post> postList = postRepository.findAll(pageable);
+
+    List<Post> listOfPost = postList.getContent();
+
+    List<PostDto> content = listOfPost.stream().map(post -> modelMapper.map(post, PostDto.class)).collect(Collectors.toList());
+
+    PostResponse postResponse = new PostResponse();
+    postResponse.setContent(content);
+    postResponse.setPageNo(postList.getNumber());
+    postResponse.setPageSize(postList.getSize());
+    postResponse.setTotalElements(postList.getTotalElements());
+    postResponse.setTotalPages(postList.getTotalPages());
+    postResponse.setLast(postList.isLast());
+    return postResponse;
+ }
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+SORTING SUPPORT TO GET METHOD OF REST API:
+
+The "Sort" object in Spring Data is a fundamental component used to define sorting criteria for queries, specifically when fetching data from a database. 
+It allows you to specify the order in which data should be retrieved based on one or more fields. This object encapsulates details about how the data should 
+be sorted and provides the necessary flexibility for arranging data in a desired sequence.
+
+Key Aspects of the Sort Object:
+    Creation of Sort Criteria:
+    It’s instantiated using the Sort.by() method, specifying the field names and the direction of sorting.
+    Sort.by("fieldName").ascending() sorts data based on the specified field in ascending order.
+    Sort.by("fieldName").descending() sorts data based on the specified field in descending order.
+
+    Multiple sorting fields:
+    Multiple fields can be included to establish a compound sort order using the and() method.
+    Ex: Sort.by("field1").ascending().and(Sort.by("field2").descending())
+
+1. Modify PostService interface:
+
+PostResponse getAllPost(int pageNo, int pageSize, String sortBy);
+
+Modify PostServiceImplementation class:
+
+    @Override
+    public PostResponse getAllPost(int pageNo, int pageSize, String sortBy) {
+      
+        Pageable pageable = PageRequest.of(pageNo, pageSize, Sort.by(sortBy));
+
+        Page<Post> postList = postRepository.findAll(pageable);
+
+        List<Post> listOfPost = postList.getContent();
+
+        List<PostDto> content = listOfPost.stream().map(post -> modelMapper.map(post, PostDto.class)).collect(Collectors.toList());
+
+        PostResponse postResponse = new PostResponse();
+        postResponse.setContent(content);
+        postResponse.setPageNo(postList.getNumber());
+        postResponse.setPageSize(postList.getSize());
+        postResponse.setTotalElements(postList.getTotalElements());
+        postResponse.setTotalPages(postList.getTotalPages());
+        postResponse.setLast(postList.isLast());
+        return postResponse;
+    }
+
+2. Modify PostController class
+
+@GetMapping
+ public PostResponse getAllPost(
+  @RequestParam(value = "pageNo", defaultValue = "0", required = false) int pageNo,
+  @RequestParam(value = "pageSize", defaultValue = "10", required = false) int pageSize,
+  @RequestParam(value = "sortBy", defaultValue = "id", required = false) String sortBy
+ ) {
+      return postService.getAllPost(pageNo, pageSize, sortBy);
+ }
+
+Ex: localhost:8080/api/v1/posts?pageNo=0&pageSize=10&sortBy=name&sortDir=asc
+The above url returns data of 1st 10 records in the database table. The data will be sorted in ascending order by the "name" column in the table.
+

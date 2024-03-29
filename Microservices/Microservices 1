@@ -1,0 +1,135 @@
+PRINCIPLE OF MICROSERVICES:
+
+1. Single Responsibility principle:
+The single responsibility principle states that a class or a module in a program should have only one responsibility. Any microservice cannot serve more than one responsibility, at a time.
+
+2. Modeled around business domain:
+Microservice never restrict itself from accepting appropriate technology stack or database. The stack or database is most suitable for solving the business purpose.
+
+3. Isolated failure:
+The large application can remain mostly unaffected by the failure of a single module. It is possible that a service can fail at any time. So, it is important to detect failure quickly, if possible, automatically restore failure.
+
+4. Infrastructure automation:
+The infrastructure automation is the process of scripting environments. With the help of scripting environment, we can apply the same configuration to a single node or thousands of nodes. It is also known as configuration management, scripted infrastructures, and system configuration management.
+
+5. Deploy independently:
+Microservices are platform agnostic. It means we can design and deploy them independently without affecting the other services. 
+
+Difference between Microservices Architecture (MSA) and Services-Oriented Architecture (SOA):
+
+1. Microservices uses lightweight protocols such as REST, and HTTP, etc.  	SOA supports multi-message protocols.
+2. It focuses on decoupling.    It focuses on application service reusability.
+3. It uses a simple messaging system for communication.     It uses Enterprise Service Bus (ESB) for communication.
+4. Microservices follows "share as little as possible" architecture approach.     SOA follows "share as much as possible architecture" approach.
+5. Microservices are much better in fault tolerance in comparison to SOA. 
+6. Each microservice have an independent database.      SOA services share the whole data storage.
+7. MSA used modern relational databases.         	SOA used traditional relational databases.
+8. MSA tries to minimize sharing through bounded context (the coupling of components and its data as a single unit with minimal dependencies).
+    SOA enhances component sharing.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+COMPONENTS OF MICROSERVICES:
+
+- Spring Cloud Config Server:
+Spring Cloud Config Server provides the HTTP resource-based API for external configuration in the distributed system. We can enable the Spring Cloud Config Server by using the annotation @EnableConfigServer. 
+
+- Netflix Eureka Naming Server:
+Netflix Eureka Server is a discovery server. It provides the REST interface to the outside for communicating with it. A microservice after coming up, register itself as a discovery client. The Eureka server also has another software module called Eureka Client. Eureka client interacts with the Eureka server for service discovery. The Eureka client also balances the client requests.
+
+- Hystrix Server:
+Hystrix server acts as a fault-tolerance robust system. It is used to avoid complete failure of an application. It does this by using the Circuit Breaker mechanism. If the application is running without any issue, the circuit remains closed. If there is an error encountered in the application, the Hystrix Server opens the circuit. The Hystrix server stops the further request to calling service. It provides a highly robust system.
+
+- Netflix Zuul API Gateway Server:
+Netflix Zuul Server is a gateway server from where all the client request has passed through. It acts as a unified interface to a client. It also has an inbuilt load balancer to load the balance of all incoming request from the client.
+
+- Netflix Ribbon:
+Netflix Ribbon is the client-side Inter-Process Communication (IPC) library. It provides the client-side balancing algorithm. It uses a Round Robin Load Balancing
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Circuit Breaker Pattern:
+
+When one service synchronously invokes another there is always the possibility that the other service is unavailable or is exhibiting such high latency it is essentially unusable. Precious resources such as threads might be consumed in the caller while waiting for the other service to respond. This might lead to resource exhaustion, which would make the calling service unable to handle other requests. The failure of one service can potentially cascade to other services throughout the application.
+
+Cicuit breaker is used to stop propagation of network or service failure to other services. It isolates the faulty service from the architecture of project.
+
+A service client should invoke a remote service via a proxy that functions in a similar fashion to an electrical circuit breaker. When the number of consecutive failures crosses a threshold, the circuit breaker trips, and for the duration of a timeout period all attempts to invoke the remote service will fail immediately. After the timeout expires the circuit breaker allows a limited number of test requests to pass through. If those requests succeed the circuit breaker resumes normal operation. Otherwise, if there is a failure the timeout period begins again.
+
+States of circuit breaker pattern :
+1. Closed state: When both services which are interacting are up and running, circuit breaker is CLOSED. Circuit breaker is counting the number of remote API calls continuously.
+
+2. Open state: As soon as the percentage of failing remote API calls is exceeding the given threshold, circuit breaker changes its state to OPEN state. Calling micro service will fail immediately, and an exception will be returned. That means, the flow is interrupted.
+
+3. Half open state: After staying at OPEN state for a given timeout period, breaker automatically turns its state into HALF OPEN state. In this state, only a LIMITED number of remote API calls are allowed to pass through. If the failing calls count is greater than this limited number, breaker turns again into OPEN state. Otherwise it is CLOSED.
+
+EX:
+
+@RestController                // Rates microservice
+@RequestMapping("api")
+public class RateController {
+
+    @Autowired
+    private RateService rateService;
+
+    @GetMapping(path = "/rates/{type}")
+    public ResponseEntity<Rate> getRateByType(@PathVariable("type") String type) {
+        return ResponseEntity.ok().body(rateService.getRateByType(type));
+    }
+}
+
+@Service
+public class RateService {
+
+    @Autowired
+    private RateRepository repository;
+
+    public Rate getRateByType(String type) {
+        return repository.findByType(type).orElseThrow(() -> new RuntimeException("Rate Not Found: " + type));
+    }
+}
+
+@RestController
+@RequestMapping("api")                // Loans microservice
+public class LoanController {
+
+    @Autowired
+    private LoanService loanService;
+
+    @GetMapping(path = "/loans")
+    public ResponseEntity<List<Loan>> getLoansByType(@RequestParam("type") String type) {
+        return ResponseEntity.ok().body(loanService.getAllLoansByType(type.toUpperCase()));
+    }
+}
+
+@Service
+public class LoanService {    
+    @Autowired
+    private LoanRepository loanRepository;    
+    
+    @Autowired
+    private RestTemplate restTemplate;    
+    
+    private static final String SERVICE_NAME = "loan-service";    
+    private static final String RATE_SERVICE_URL = "http://localhost:9000/api/rates/";
+    
+    public List<Loan> getAllLoansByType(String type) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<InterestRate> entity = new HttpEntity<>(null, headers);
+
+        ResponseEntity<InterestRate> response = restTemplate.exchange(
+            (RATE_SERVICE_URL + type),
+            HttpMethod.GET, entity,
+            InterestRate.class
+        );
+
+        InterestRate rate = response.getBody();
+        List<Loan> loanList = new ArrayList<>();
+        if (rate != null) {
+            loanList = loanRepository.findByType(type);
+            for (Loan loan : loanList) {
+                loan.setInterest(loan.getAmount() * (rate.getRateValue() / 100));
+            }
+        }
+        return loanList;
+    }
+}

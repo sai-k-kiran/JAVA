@@ -1,0 +1,508 @@
+The java.util.concurrent package provides tools for creating concurrent applications.
+
+MAIN COMPONENTS:
+
+1. Executor:
+
+Executor is an interface that represents an object that executes provided tasks. It depends on the implementation if the task should be run on new or current thread.
+Using this interface, we can decouple the task execution flow from actual task execution mechanism.
+
+Executor does not strictly require the task execution to be asynchronous. Executor can invoke the submitted task instantly in the invoking thread.
+
+public class Invoker implements Executor {
+    @Override
+    public void execute(Runnable r) {
+        r.run();
+    }
+}
+
+public void execute() {
+    Executor executor = new Invoker();
+    executor.execute( () -> {
+        // task to be performed
+    });
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+2.  ExecutorService --> In Advanced Concurrency.txt
+
+3. ScheduledExecutorService: 
+ScheduledExecutorService is a similar interface to ExecutorService, but it can perform tasks periodically.
+
+Executor and ExecutorService‘s methods are scheduled on the spot without introducing any artificial delay. Zero or any negative value signifies that the 
+request needs to be executed instantly.
+
+ScheduledExecutorService can also schedule the task after some given fixed delay:
+
+executorService.scheduleAtFixedRate(() -> {
+     a runnable command...
+}, 1, 10, TimeUnit.SECONDS);
+
+scheduleAtFixedRate(runnable command, long initial delay, long period, TimeUnit unit)  --> Creates and executes a periodic action with initial delay and then
+repeats the action with given "period" amt of time until service instance shuts down.
+
+scheduleWithFixedDelay( Runnable command, long initialDelay, long delay, TimeUnit unit )  --> Same as above but there is a delay of "delay" amt betn the end
+of one task execution and the beginning of next one.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+4. Future (interface):
+
+Future class represents a future result of an asynchronous computation. This result will eventually appear in the Future after the processing is complete.
+It comes with methods for checking if the asynchronous operation is completed or not, getting the computed result, etc.
+
+cancel(boolean interrupt) cancels the operation and releases the executing thread if "interrupt" param is true.
+
+class Calculate{
+    ExecutorService executorService = Executors.newFixedThreadPool(10);     // fixed thread pool of size 10.
+
+    public Future<Integer> calc(Integer input) {        
+        return executor.submit(() -> {
+            Thread.sleep(1000);
+            return input * input;
+        });
+    }
+}
+
+Future<Integer> future = Calculate.calc(10);
+int res = 0;
+
+if (future.isDone() && !future.isCancelled()) {
+    try {
+        res = future.get(10L, TimeUnit.SECONDS);    --> if task takes more than 10 secs, TimeoutException is thrown
+    } catch (InterruptedException | ExecutionException e) {
+        e.printStackTrace();
+    }
+}
+
+Callable is an interface representing a task that returns a result, and has a single "call()" method. We create an object of "Callable" and pass it to
+an executor that will take care of starting the task in a new thread, and give us back the "Future" object. 
+
+Once we have an ExecutorService object, we just need to call submit(), passing our Callable as an argument. Then submit() will start the task and return a 
+"FutureTask" object, which is an implementation of the Future interface.
+
+Future.isCancelled() tells if a Future was already cancelled. This can be quite useful to avoid getting a CancellationException.    
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+COMPLETABLEFUTURE (class):
+
+The Future interface serves a result of an asynchronous computation, but it did not have any methods to combine these computations or handle possible errors.
+A Future that may be explicitly completed (setting its value and status), and may be used as a CompletionStage, supporting dependent functions and actions 
+that trigger upon its completion. CompletableFuture implements "Future" and "CompletionStage" interfaces.
+
+public Future<String> calculateAsync() throws InterruptedException {
+    CompletableFuture<String> completableFuture = new CompletableFuture<>();
+
+    Executors.newCachedThreadPool().submit(() -> {
+        Thread.sleep(500);
+        completableFuture.complete("Hello");
+        return null;
+    });
+
+    return completableFuture;
+}
+
+In the example, we have a method that creates a CompletableFuture instance, then spins off some computation in another thread and returns the Future immediately.
+When the computation is done, the method completes the Future by providing the result to the complete method. To spin off the computation, we use the 
+Executor API. This method of creating and completing a CompletableFuture can be used with any concurrency mechanism or API, including raw threads.
+
+"calculateAsync()" method returns a Future instance.
+
+Future<String> completableFuture = calculateAsync();
+
+String result = completableFuture.get();
+assertEquals("Hello", result);
+
+The get method throws some checked exceptions, namely ExecutionException (encapsulating an exception that occurred during a computation) and 
+InterruptedException (an exception signifying that a thread was interrupted either before or during an activity)
+
+To execute code asynchronously, Static methods "runAsync()" and "supplyAsync()" allow us to create a CompletableFuture instance out of Runnable and Supplier 
+functional types correspondingly. This allows us to provide an instance of the Supplier as a lambda expression that does the calculation and returns the result
+
+CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> "Hello");
+
+assertEquals("Hello", future.get());     // true
+
+The most generic way to process the result of a computation is to feed it to a function. The thenApply method accepts a Function instance, 
+uses it to process the result, and returns a Future that holds a value returned by a function
+
+CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> "Hello");
+
+CompletableFuture<String> future = completableFuture.thenApply(s -> s + " World");
+
+assertEquals("Hello World", future.get());    // true
+
+If we don’t need to return a value down the Future chain, we can use an instance of the Consumer functional interface. Its single method takes a 
+parameter and returns void. The "thenAccept()" method receives a Consumer and passes it the result of the computation. Then the final future.get() 
+call returns an instance of the Void type.
+
+CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> "Hello");
+
+CompletableFuture<Void> future = completableFuture
+  .thenAccept(s -> System.out.println("Computation returned: " + s));
+
+future.get();
+
+If we neither want a value of a computation nor want to return some value at the end of Future chain, then we can pass a Runnable lambda to the "thenRun()":
+
+CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> "Hello");
+
+CompletableFuture<Void> future = completableFuture
+  .thenRun(() -> System.out.println("Computation finished."));
+
+future.get();
+
+This simply prints a line in the console after calling the future.get().
+
+The advantage of CompletableFuture is the ability of combining multiple CompletableFuture objects in a chain of computation steps. The result of this chaining
+is also a CompletableFuture that futher combining and chaining. This approach is ubiquitous in functional languages and is referred to as a monadic design pattern.
+
+The "thenCompose()" method chains two Future objects sequentially. This method takes a function that returns a CompletableFuture instance. The argument
+of this method is the result of previous computation step. This allows us to use this value inside the next CompletableFuture's lambda.
+
+CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> "Hello")    --> 1st CompletableFuture
+    .thenCompose(s -> CompletableFuture.supplyAsync(() -> s + " World"));       --> 2nd CompletableFuture
+
+completableFuture.get()   // returns Hello world.
+
+The "thenCompose()" method, together with "thenApply()", implements the basic building blocks of the monadic pattern. They closely relate to the map and 
+flatMap methods of Stream and Optional classes.
+
+Both methods receive a function and apply it to the computation result, but the thenCompose (flatMap) method receives a function that 
+returns another object of the same type.
+
+If we want to execute two independent Futures and do something with their results, we can use the thenCombine method that accepts a Future and a 
+Function with two arguments to process both results:
+
+CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> "Hello")
+    .thenCombine(CompletableFuture.supplyAsync(
+      () -> " World"), (s1, s2) -> s1 + s2);
+
+assertEquals("Hello World", completableFuture.get());    // true
+
+Difference Between thenApply() and thenCompose():
+
+- We can use "thenApply()" to work with the result of the previous call. However, the return type will be combined of all calls. This method is useful when 
+we want to transform the result of a CompletableFuture call:
+
+CompletableFuture<Integer> finalResult = compute().thenApply(s-> s + 1);
+
+- "thenCompose()" uses the previous stage as the argument. It will flatten and return a Future with the result directly, rather than a nested future 
+as in thenApply(). If the idea is to chain CompletableFuture methods, then it’s better to use thenCompose().
+
+CompletableFuture<Integer> computeAnother(Integer i){
+    return CompletableFuture.supplyAsync(() -> 10 + i);
+}
+CompletableFuture<Integer> finalResult = compute().thenCompose(this::computeAnother);
+
+- The difference between these two methods is analogous to the difference between map() and flatMap().
+
+There is more to CompletableFuture, read that....
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+5. Semaphore  --> In More.txt
+
+6. ThreadFactory 
+
+ThreadFactory acts as a thread (non-existing) pool which creates a new thread on demand. It eliminates the need of a lot of boilerplate coding 
+for implementing efficient thread creation mechanisms.
+
+public class CustomThreadFactory implements ThreadFactory {
+    private int id;
+    private String name;
+
+    public CustomThreadFactory(String name) {
+        id = 1;
+        this.name = name;
+    }
+
+    @Override
+    public Thread newThread(Runnable r) {
+        Thread t = new Thread(r, name + "-Thread-" + id);
+
+        LOG.info("created new thread with id : " + id + " and name : " + t.getName());
+        id++;
+        return t;
+    }
+}
+
+CustomThreadFactory factory = new CustomThreadFactory("customThread");
+for (int i = 0; i < 10; i++) { 
+    Thread t = factory.newThread(new Task());
+    t.start(); 
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+7. BlockingQueue
+
+It is a data structure to implement  producer-consumer pattern in async programming which is used in these async scenarios.
+
+8. DelayQueue
+
+DelayQueue is an infinite-size blocking queue of elements where an element can only be pulled if it’s expiration time (known as user defined delay) is 
+completed. Hence, the topmost element (head) will have the most amount delay and it will be polled last.
+
+9. Locks  --> In Advanced Concurrency.txt
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+FORK/JOIN FRAMEWORK:
+
+ForkJoinPool is the heart of the fork/join framework. It is an implementation of the ExecutorService that manages worker threads & provides tools to
+get info about the thread pool state and performance.
+
+Worker threads can execute only one task at a time, but the ForkJoinPool doesn’t create a separate thread for every single subtask.
+Instead, each thread in the pool has its own deque that stores tasks. This architecture is vital for balancing the thread’s workload with the help 
+of the work-stealing algorithm.
+
+Work stealing algorithm:
+Simply put, free threads try to “steal” work from deques of busy threads. By default, a worker thread gets tasks from the head of its own deque. When it is 
+empty, the thread takes a task from the tail of the deque of another busy thread or from the global entry queue since this is where the biggest pieces of 
+work are likely to be located.
+
+This approach minimizes the possibility that threads will compete for tasks. It also reduces the number of times the thread will have to go looking for 
+work, as it works on the biggest available chunks of work first.    
+
+ForkJoinPool commonPool = ForkJoinPool.commonPool();    -->  provides a reference to the common pool, which is a default thread pool for every ForkJoinTask.
+Using the predefined common pool reduces resource consumption since this discourages the creation of a separate thread pool per task.
+
+public static ForkJoinPool forkJoinPool = new ForkJoinPool(2);
+ForkJoinPool forkJoinPool = PoolUtil.forkJoinPool;
+
+Here the pool has a parallelism level of 2. This means that pool will use two processor cores.
+
+FORKJOINTASK:
+
+ForkJoinTask is an abstract class which implements Future, and is capable of running a large number of tasks hosted by a small number of actual threads 
+in ForkJoinPool. ForkJoinTask is the base type for tasks executed inside ForkJoinPool. One of its two subclasses should be extended: the "RecursiveAction" 
+for void tasks and the "RecursiveTask<V> "for tasks that return a value. They both have an abstract method "compute()" in which the task’s logic is defined.
+
+ForkJoinTask will usually spawn new subtasks as part of the work required to complete its main task. It generates new tasks by calling fork(), and it gathers 
+all results with join().
+
+public class FactorialSquareCalculator extends RecursiveTask<Integer> {
+ 
+    private Integer n;
+
+    public FactorialSquareCalculator(Integer n) {
+        this.n = n;
+    }
+
+    @Override
+    protected Integer compute() {          --> method in "RecursiveTask" class.
+        if (n <= 1) return n;
+
+        FactorialSquareCalculator calculator = new FactorialSquareCalculator(n - 1);
+
+        calculator.fork();
+
+        return n * n + calculator.join();
+    }
+}
+
+ForkJoinPool forkJoinPool = new ForkJoinPool();
+
+FactorialSquareCalculator calculator = new FactorialSquareCalculator(10);
+forkJoinPool.execute(calculator);
+
+To initiate the execution of a subtask, we call "fork()", a non-blocking method. The join() method will return the result from that calculation, to which 
+we’ll add the square of the number we’re currently visiting.
+
+1. RecursiveAction -->
+
+public class CustomRecursiveAction extends RecursiveAction {
+
+    private String workload = "";
+    private static final int THRESHOLD = 4;
+
+    public CustomRecursiveAction(String workload) {
+        this.workload = workload;
+    }
+
+    @Override
+    protected void compute() {
+        if (workload.length() > THRESHOLD) {
+            ForkJoinTask.invokeAll(createSubtasks());        --> The list is submitted to the ForkJoinPool using the invokeAll() method:
+        } else {
+           processing(workload);
+        }
+    }
+
+    private List<CustomRecursiveAction> createSubtasks() {
+        List<CustomRecursiveAction> subtasks = new ArrayList<>();
+
+        String partOne = workload.substring(0, workload.length() / 2);
+        String partTwo = workload.substring(workload.length() / 2, workload.length());
+
+        subtasks.add(new CustomRecursiveAction(partOne));
+        subtasks.add(new CustomRecursiveAction(partTwo));
+
+        return subtasks;
+    }
+
+    private void processing(String work) {
+        String result = work.toUpperCase();
+    }
+}
+
+CustomRecursiveAction recursiveAction = new CustomRecursiveAction("This is word more than eight");
+
+forkJoinPool.execute(recursiveAction);
+String result = recursiveAction.join();     --> forks the task
+
+The String is recursively divided into substrings, creating "CustomRecursiveTask" instances that are based on these substrings.
+
+2. RecursiveTask<V>   -->
+
+public class CustomRecursiveTask extends RecursiveTask<Integer> {
+    private int[] arr;
+
+    private static final int THRESHOLD = 20;
+
+    public CustomRecursiveTask(int[] arr) {
+        this.arr = arr;
+    }
+
+    @Override
+    protected Integer compute() {
+        if (arr.length > THRESHOLD) {
+            return ForkJoinTask.invokeAll(createSubtasks())
+              .stream()
+              .mapToInt(ForkJoinTask::join)
+              .sum();
+        } else {
+            return processing(arr);
+        }
+    }
+
+    private Collection<CustomRecursiveTask> createSubtasks() {
+        List<CustomRecursiveTask> tasks = new ArrayList<>();
+
+        tasks.add(new CustomRecursiveTask(Arrays.copyOfRange(arr, 0, arr.length / 2)));
+        tasks.add(new CustomRecursiveTask(Arrays.copyOfRange(arr, arr.length / 2, arr.length)));
+
+        return tasks;
+    }
+
+    private Integer processing(int[] arr) {
+        return Arrays.stream(arr)
+          .filter(a -> a > 10 && a < 27)
+          .map(a -> a * 10)
+          .sum();
+    }
+}
+CustomRecursiveTask recursiveTask = new CustomRecursiveTask(new int[]{2,3,5,3,7,5,9,7,4,6});
+
+forkJoinPool.execute(recursiveTask);
+int result = recursiveTask.join();     --> forks the task
+
+The invokeAll() method submits the subtasks to the common pool and returns a list of Future. To trigger execution, the join() method is called for 
+each subtask.
+
+int result = forkJoinPool.invoke(customRecursiveTask);  --> invoke() method forks the task and waits for the result and doesn’t need any manual joining.
+
+The invokeAll() method submits a sequence of ForkJoinTasks to the ForkJoinPool. It takes tasks as parameters (two tasks, var args or a collection), 
+forks and then returns a collection of "Future" objects in the order in which they were produced.
+
+Alternatively, we can use separate fork() and join() methods. The fork() method submits a task to a pool, the join() method triggers its execution.
+
+customRecursiveTaskFirst.fork();
+result = customRecursiveTaskLast.join()  --> RecursiveAction returns null, RecursiveTask returns result of task's execution.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+THREADLOCAL API:
+
+The "TheadLocal" construct allows us to store data that will be accessible only by a specific thread.
+
+ThreadLocal<Integer> threadLocalValue = new ThreadLocal<>();
+
+threadLocalValue.set(1);
+Integer result = threadLocalValue.get();       // 1
+
+We can initialize a threadlocal by passing a supplier to its "withInitial()" static method.
+
+ThreadLocal<Integer> threadLocal = ThreadLocal.withInitial(() -> 1);
+
+threadLocal.remove();   --> To remove the value from the ThreadLocal
+
+EX:
+Storing User Data in a Map:
+
+public class Context {
+    private String userName;
+
+    public Context(String userName) {
+        this.userName = userName;
+    }
+}
+
+We want to have one thread per user id. We’ll create a SharedMapWithUserContext class that implements the Runnable interface:
+
+public class SharedMapWithUserContext implements Runnable {
+ 
+    public static Map<Integer, Context> contextPerUserId = new ConcurrentHashMap<>();
+    private Integer userId;
+    private UserRepository userRepository = new UserRepository();
+
+    @Override
+    public void run() {
+        String userName = userRepository.getUserNameForUserId(userId);
+        contextPerUserId.put(userId, new Context(userName));
+    }
+}
+
+SharedMapWithUserContext firstUser = new SharedMapWithUserContext(1);
+SharedMapWithUserContext secondUser = new SharedMapWithUserContext(2);
+new Thread(firstUser).start();
+new Thread(secondUser).start();
+
+Storing data in threadlocal:
+
+We can rewrite our example to store the "Context" object using a ThreadLocal. Each thread will have its own ThreadLocal instance.
+
+ThreadLocal instance is associated with a particular thread. In our example, we have a dedicated thread for each particular userId, and this thread 
+is created by us, so we have full control over it.
+
+The run() method will fetch the user context and store it into the ThreadLocal variable using the set() method.
+
+public class ThreadLocalWithUserContext implements Runnable {
+ 
+    private static ThreadLocal<Context> userContext = new ThreadLocal<>();
+    private Integer userId;
+    private UserRepository userRepository = new UserRepository();
+
+    @Override
+    public void run() {
+        String userName = userRepository.getUserNameForUserId(userId);
+        userContext.set(new Context(userName));
+    }
+}
+
+ThreadLocalWithUserContext firstUser = new ThreadLocalWithUserContext(1);
+ThreadLocalWithUserContext secondUser = new ThreadLocalWithUserContext(2);
+new Thread(firstUser).start();
+new Thread(secondUser).start();
+
+ThreadLocal provides an easy-to-use API to confine some values to each thread. This is a reasonable way of achieving thread-safety in Java. 
+However, we should be extra careful when we’re using ThreadLocals and thread pools together.
+
+1. First, the application borrows a thread from the pool.
+2. Then it stores some thread-confined values into the current thread’s ThreadLocal.
+3. Once the current execution finishes, the application returns the borrowed thread to the pool.
+4. After a while, the application borrows the same thread to process another request.
+5. Since the application didn’t perform the necessary cleanups last time, it may re-use the same ThreadLocal data for the new request.
+
+This may cause surprising consequences in highly concurrent applications. One way to solve this problem is to manually remove each ThreadLocal 
+once we’re done using it. Because this approach needs rigorous code reviews, it can be error-prone.
+
+To remove the ThreadLocal instance once we are done, we can extend "ThreadPoolExecutor" class. It provides custom hook implementation for the 
+"beforeExecute()" & "afterExecute()" method. The thread pool will call "beforeExecute()" before running anything using the thread. After the thread's work
+is done, we can remove it in afterExecute() method.
+
+public class ThreadLocalAwareThreadPool extends ThreadPoolExecutor {
+
+    @Override
+    protected void afterExecute(Runnable r, Throwable t) {
+        // Call remove on each ThreadLocal
+    }
+}

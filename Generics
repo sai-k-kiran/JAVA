@@ -1,0 +1,440 @@
+GENERICS:
+Generic in Java is added to provide compile-time type-safety of code and removing the risk of ClassCastException at runtime. Ex: Set of Strings must contain Strings,
+if an Integer is added then compiler will highlight using curly underlines.
+
+    public class Box {
+        private Object object;
+
+        public void set(Object object) { this.object = object; }
+        public Object get() { return object; }
+    }
+
+Since its methods accept or return an Object, you are free to pass in whatever you want, provided that it is not one of the primitive types. There is no way to verify, 
+at compile time, how the class is used. One part of code may place an Integer & expect Integer. Another part may place a String & gets runtime error.
+
+To update the Box class to use generics, you create a generic type declaration:
+
+    public class Box<T> {    // all occurrences of Object are replaced by T. T = raw type
+        private T t;
+
+        public void set(T t) { this.t = t; }
+        public T get() { return t; }
+    }
+
+In older API classes(before JDK 5.0), generics were not available so many codebases has legacy codes. We can account for backward compatibility by:
+
+    Box<Integer> box = new Box<>();  // parametrized type
+    Box rawBox = box;          // raw type of Box<T>, rawBox = box is fine but box = rawBox is wrong
+
+Using old(non-generic) code can give warnings : Example.java uses unchecked or unsafe operations. The term "unchecked" means that the compiler does not have enough type 
+information to perform all type checks necessary to ensure type safety. The "unchecked" warning is disabled, by default, though the compiler gives a hint. To see all 
+"unchecked" warnings, recompile with -Xlint:unchecked.
+
+To completely disable unchecked warnings, use the -Xlint:-unchecked flag. The @SuppressWarnings("unchecked") annotation suppresses unchecked warnings.
+
+Generic methods are methods that introduce their own type parameters. This is similar to declaring a generic type, but the type parameters scope is limited to the 
+method where it is declared.
+
+    public class Util {
+        public static <K, V> boolean compare(Pair<K, V> p1, Pair<K, V> p2) {
+            return p1.getKey().equals(p2.getKey()) &&
+                p1.getValue().equals(p2.getValue());
+        }
+    }
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+BOUNDED TYPE PARAMETERS:
+There may be times when you want to restrict the types that can be used as type arguments in a parameterized type. For ex, a method that operates on numbers might only 
+want to accept instances of Number or its subclasses. This is what bounded type parameters are for.
+To declare a bounded type parameter, list the type parameters name, followed by the extends keyword, followed by its upper bound.
+
+    public <U extends Number> void inspect(U u){       // U can be of any type which is a Number or its subtype(Double, Integer)
+        System.out.println("U: " + u.getClass().getName());
+    }
+
+    class D <T extends A & B & C> {   // multiple bounds
+        //....
+    }
+
+Generic Methods and Bounded Type Parameters:
+    public static <T> int countGreaterThan(T[] anArray, T elem) {
+        int count = 0;
+        for (T e : anArray)
+            if (e > elem) count++;    // compiler error
+
+        return count;
+    }
+
+The above program doesnt compile because ">" operator works with only to primitive types such as short, int, double, long, float, byte, and char. so
+
+    public static <T extends Comparable<T>> int countGreaterThan(T[] anArray, T elem) {
+        int count = 0;
+        for (T e : anArray)
+            if (e.compareTo(elem) > 0) count++;
+        return count;
+    }
+
+    Box<Number> box = new Box<>();
+    box.add(new Integer(1));   // OK
+    box.add(new Double(2));    // OK
+
+Given 2 concrete types A and B, MyClass<A> has no relationship to MyClass<B>, regardless of whether or not A and B are related.
+
+    public void boxTest(Box<Number> n) { /* ... */ }    // you cant pass Box<Integer> to this method as an arg even if Box<U extends Number>
+
+    public void boxTest(Collection<String> list) { /* ... */ }  // you can pass List<String>, ArrayList<String> coz these 2 are subtype of Collection
+
+interface PayloadList<E,P> extends List<E> {  // P type is optional value, ew can set it to any type. Only E should be constant
+  void setPayload(int index, P val);
+  ...
+}
+
+    PayloadList<String, String>, PayloadList<String, Integer>, PayloadList<String, Exception>
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+TYPE INFERENCE:
+Type inference is a Java compilers ability to look at each method invocation and corresponding declaration to determine the type argument (or arguments) that make the 
+invocation applicable. The inference algorithm determines the types of the arguments and, if available, the type that the result is being assigned.
+Finally, the inference algorithm tries to find the most specific type that works with all of the arguments.
+
+    static <T> T pick(T a1, T a2) { return a2; }   
+    Serializable s = pick("d", new ArrayList<String>());      // returns 2nd arg, that means 2nd argument here is of Type Serializable  
+
+    public class BoxDemo {
+        public static <U> void addBox(U u, List<Box<U>> boxes) {
+            Box<U> box = new Box<>();
+            box.set(u);
+            boxes.add(box);
+        }
+    }
+
+    BoxDemo.<Integer>addBox(Integer.valueOf(10), listOfIntegerBoxes);   //   BoxDemo.<Integer>addBox() this syntax becoz addBox is a static method.
+    BoxDemo.addBox(Integer.valueOf(20), listOfIntegerBoxes);  // no type(<Integer>). But the arg Integer.valueOf(10) is read by inference algo & type is set to Integer
+
+You can replace the type args required to invoke the constructor of a generic class with an empty set of type params as long as the compiler can infer the type args.
+
+    Map<String, String> myMap = new HashMap<String, String>();      -->   Map<String, String> myMap = new HashMap<>();
+
+Note that to take advantage of type inference during generic class instantiation, you must use the diamond. In the following example, the compiler generates an 
+unchecked conversion warning because the HashMap() constructor refers to the HashMap raw type, not the Map<String, String> type:
+
+    Map<String, String> myMap = new HashMap(); // unchecked conversion warning
+
+It is important to note that the inference algorithm uses only invocation arguments, target types, and possibly an obvious expected return type to infer types. 
+The inference algorithm does not use results from later in the program. 
+
+Constructors can also be generic. Type inference for a constructor works exactly same as for method
+    class MyClass<X> {
+        <T> MyClass(T t) {
+            // ...
+        }
+    }
+
+    MyClass<Integer> obj = new MyClass<>(" ") 
+The compiler infers the type "Integer" for  X of the generic class MyClass<X>. It infers the type "String" for T of the constructor of this generic class.
+
+The Java compiler takes advantage of target typing to infer the type parameters of a generic method invocation. The target type of an expression is the data type 
+that the Java compiler expects depending on where the expression appears.
+
+    static <T> List<T> emptyList();
+    List<String> listOne = Collections.emptyList();  //  expecting an instance of List<String>; this data type is the target type
+
+Because the method emptyList() returns a value of type List<T>, the compiler infers that the type argument T must be the value String. Alternatively, you could 
+use a type witness and specify the value of T as follows:
+
+    List<String> listOne = Collections.<String>emptyList(); // emptyList() isnt a static method
+
+For Java SE 7, following code will generate an error:
+    void processStringList(List<String> stringList) {
+        // process stringList
+    }
+    processStringList(Collections.emptyList());    // error : List<Object> cannot be converted to List<String>
+
+The compiler requires a value for the type argument T so it starts with the value Object. Consequently, the invocation of Collections.emptyList returns a value of type 
+List<Object>, which is incompatible with the method processStringList. Thus, in Java SE 7, you must specify the value of the value of the type argument as follows:
+
+    processStringList(Collections.<String>emptyList());
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+WILDCARDS:
+
+In generic code, the question mark (?), called the wildcard, represents an unknown type. The wildcard can be used in a variety of situations: as the type of a parameter, 
+field, or local variable; sometimes as a return type (though it is better programming practice to be more specific). 
+The wildcard is never used as a type argument for a generic method invocation, a generic class instance creation, or a supertype.
+
+* Unbounded wild cards (Invariant):
+
+The unbounded wildcard type is specified using the wildcard character (?), for example, List<?>. This is called a list of unknown type.
+There are two scenarios where an unbounded wildcard is a useful approach:
+
+    - If you are writing a method that can be implemented using functionality provided in the Object class.
+    - When the code is using methods in the generic class that don't depend on the type parameter. For ex, List.size() or List.clear().
+      Class<?> is so often used because most of the methods in Class<T> do not depend on T.
+
+NOTE: It's important to note that List<Object> and List<?> are not the same. You can insert an Object, or any subtype of Object, into a List<Object>. 
+But you can only insert null into a List<?>.
+
+Collections are invariant.
+
+* Upper Bounded Wild cards (Co-variant):
+You can use an upper bounded wildcard to relax the restrictions on a variable. For example, say you want to write a method that works on List<Integer>, List<Double>, & 
+List<Number>; you can achieve this by using an upper bounded wildcard.
+
+    List<? extends Number> list = new ArrayList<>();  // extends mean either extends (for classes) & implements (for interfaces)
+
+    public static void process(List<? extends Foo> list) {
+        int sum = 0;
+        for (Foo elem : list) {
+            sum += elem.getValue();   // Foo is any type, matches Foo and any subtype of Foo.
+        }
+    }
+
+* Lower Bounded Wild cards (Contravariant):
+A lower bounded wildcard restricts the unknown type to be a specific type or a super type of that type. A lower bounded wildcard is expressed using the wildcard 
+character ('?'), following by the super keyword, followed by its lower bound: <? super A>.
+
+    public static void addNumbers(List<? super Integer> list) {
+        for (int i = 1; i <= 10; i++) {
+            list.add(i);
+        }
+    }
+
+    List<? extends Integer> intList = new ArrayList<>();
+    List<? extends Number>  numList = intList;   // OK. List<? extends Integer> is a subtype of List<? extends Number>
+
+    List<Integer> intList = new ArrayList<>();
+    List<Number> list2 = intList;     // WRONG! even though Integer is a subtype of Number
+
+Arrays are naturally co-variant. We can pass Integer[] to a method expecting Object[].
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+TYPE ERASURE:
+To implement generics, the Java compiler applies type erasure to:
+
+    - Replace all type parameters in generic types with their bounds or "Object" if the type parameters are unbounded. The produced bytecode contains only ordinary 
+      classes, interfaces, and methods.
+    - Insert type casts if necessary to preserve type safety.
+    - Generate bridge methods to preserve polymorphism in extended generic types.
+
+During the type erasure process, the Java compiler erases all type parameters and replaces each with its first bound if the type parameter is bounded, or Object if 
+the type parameter is unbounded.
+
+public class Node<T> {
+    private T data;
+    private Node<T> next;
+
+    public Node(T data, Node<T> next) {
+        this.data = data;
+        this.next = next;
+    }
+
+    public T getData() { return data; }
+}
+
+public class Node {      // compiled code 1
+    private Object data;
+    private Node next;
+
+    public Node(Object data, Node next) {
+        this.data = data;
+        this.next = next;
+    }
+
+    public Object getData() { return data; }
+}
+
+Because the type parameter is unbounded, java compiler replaces it T with "Object". 
+
+public class Node<T extends Comparable<T>> {   // if <T extends Shape> then compiler replaces it with Shape
+    private T data;
+    private Node<T> next;
+
+    public Node(T data, Node<T> next) {
+        this.data = data;
+        this.next = next;
+    }
+
+    public T getData() { return data; }
+}
+
+The Java compiler replaces the bounded type parameter T with the first bound class, Comparable. Replace "Object" with "Comparable" in above "compiled code 1".
+
+Sometimes type erasure causes a situation that you may not have anticipated. The following example shows how this can occur. The following example shows how a compiler 
+sometimes creates a synthetic method, which is called a bridge method, as part of the type erasure process.
+
+public class Node<T> {     // Unbounded so replaces with Object
+    public T data;
+
+    public Node(T data) { this.data = data; }
+
+    public void setData(T data) {
+        this.data = data;
+    }
+}
+ 
+public class MyNode extends Node<Integer> {   // Raw type
+    public MyNode(Integer data) { super(data); }
+
+    public void setData(Integer data) {
+        super.setData(data);
+    }
+}
+
+After compiling:
+
+public class Node {
+
+    public Object data;
+
+    public Node(Object data) { this.data = data; }
+
+    public void setData(Object data) {
+        this.data = data;
+    }
+}
+
+public class MyNode extends Node {
+
+    public MyNode(Integer data) { super(data); }
+
+    public void setData(Integer data) {
+        super.setData(data);
+    }
+}
+
+MyClass setData(Integer data) is different than Node setData(Object data). MyClass setData() isnt overriding Node class setData(), instead it is creating a new one.
+To solve this problem and preserve the polymorphism of generic types after type erasure, the Java compiler generates a bridge method to ensure that subtyping works 
+as expected.
+
+class MyNode extends Node {
+    public void setData(Object data) {    // Bridge method generated by the compiler. See that arg of this method is same as Node class method
+        setData((Integer) data);
+    }
+
+    public void setData(Integer data) {
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* NON - REIFIABLE TYPES:
+A reifiable type is a type whose type information is fully available at runtime. This includes primitives, non-generic types, raw types, and invocations of unbound 
+wildcards.
+
+Non-reifiable types are types where information has been removed at compile-time by type erasure. A non-reifiable type does not have all of its information available 
+at runtime. Ex: List<String> and List<Number>; the JVM cannot tell the difference between these types at runtime.
+
+Heap pollution occurs when a variable of a parameterized type refers to an object that is not of that parameterized type. This situation occurs if the program performed 
+some operation that gives rise to an unchecked warning at compile-time. An unchecked warning is generated if, either at compile-time or at runtime, the correctness of 
+an operation involving a parameterized type cannot be verified. 
+For ex, heap pollution occurs when mixing raw types and parameterized types, or when performing unchecked casts.
+
+    public static <T> void addToList (List<T> listArg, T... elements) {
+        for (T x : elements) {
+        listArg.add(x);
+        }
+    }
+
+    public static void faultyMethod(List<String>... l) {
+        Object[] objectArray = l;     // Valid
+        objectArray[0] = Arrays.asList(42);
+        String s = l[0].get(0);       // ClassCastException thrown here
+    }
+
+Java compiler convets varargs "T..." to T[] array. By type erasure, T[] is converted in Object[]. So that means we could assign any type to Object[] objectArray.
+
+    Object[] objectArray = l;   //  assigns an List<String>[] to Object[]. This may introduce heap pollution.
+    objectArray[0] = Arrays.asList(4) //  This doesnt issue any warning. We are assigning List<Integer> to Object. But all other elems in objectArray are List<String>
+
+    String s = l[0].get(0); // ClassCastException. Coz now l & objectArray has refernce to same object. So if objectArray[0] is changed, l[0] is changed too
+
+objectArray[0] = [4] (List<Integer>, not array) so l[0] will contain [4] coz reference of objectArray & l is same. If we do String s = l[0].get(0), then
+compiler will throw ClassCastException coz list[0].get(0) is an Integer(value = 4).
+
+To avoid ClassCastException or any other exc from being thrown by improper handling of varargs, we can prevent warnings that compiler generates by adding annotations
+on static & non-constructor methods:
+
+    - @SafeVarargs
+    - @SuppressWarnings({"unchecked", "varargs"})   // does not suppress warnings generated from the method's call site. So less desirable
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* RESTRICTIONS ON GENERICS:
+
+- Cannot Instantiate Generic Types with Primitive Types:
+    Pair<int, char> p = new Pair<>();  // compile-time error
+
+- Cannot Create Instances of Type Parameters
+
+    public static <E> void append(List<E> list) {
+        E elem = new E();  // compile-time error,  E elem = cls.newInstance() is OK
+        list.add(elem);
+    }
+
+- Cannot Declare Static Fields Whose Types are Type Parameters
+    public class Mobile<T> {
+        private static T OS; 
+    }
+
+As the same static field is shared by different objects(Mobile<SmartPhone>, Mobile<DumbPhone> etc.), what is the actual value of OS?
+
+- Cannot Use Casts or instanceof with Parameterized Types
+Because compiler erases the type param, we cannot check the which parameterized type is being used at runtime
+
+    public static <E> void rtti(List<E> list) {
+        if (list instanceof ArrayList<Integer>) {  // compile-time error
+            // ...
+        }
+    }
+
+The runtime does not keep track of type parameters, so it cannot tell the difference between an ArrayList<Integer> and an ArrayList<String>. We can use unbounded one:
+
+    public static void rtti(List<?> list) {
+        if (list instanceof ArrayList<?>) {  // OK; instanceof requires a reifiable type
+            // ...
+        }
+    }
+
+Typically, you cannot cast to a parameterized type unless it is parameterized by unbounded wildcards. For example:
+
+    List<Integer> li = new ArrayList<>();
+    List<Number>  ln = (List<Number>) li;  // compile-time error
+
+However, in some cases the compiler knows that a type parameter is always valid and allows the cast. For example:
+
+    List<String> l1 = ...;
+    ArrayList<String> l2 = (ArrayList<String>)l1;  // OK
+
+- Cannot Create Arrays of Parameterized Types:
+    List<Integer>[] arrayOfLists = new List<>[2];  // compile-time error
+
+- Cannot Create, Catch, or Throw Objects of Parameterized Types:
+A generic class cannot extend the Throwable class directly or indirectly
+    class MathException<T> extends Exception/Throwable {  }    // compile-time error
+
+    public static <T extends Exception, J> void execute(List<J> jobs) {
+        try {
+        } catch (T e) {   // compile-time error
+        }
+    }
+
+    class Parser<T extends Exception> {
+        public void parse(File file) throws T {     // OK
+            // ...
+        }
+    }
+
+- Cannot Overload a Method Where the Formal Parameter Types of Each method becomes same after erasure:
+A class cannot have two overloaded methods that will have the same signature after type erasure.
+
+    public class Example {
+        public void print(Set<String> strSet) { }
+        public void print(Set<Integer> intSet) { }   // OK
+    }
+
+- Cannot have return types as wild cards.
+Clients will have to create variable of the wild card type(which is not known to the client) to store the return value. This will strip the flexibility of using
+different types dynamically.

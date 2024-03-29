@@ -1,0 +1,488 @@
+* NESTED CLASSES:
+
+The Java programming language allows you to define a class within another class. Such a class is called a nested class
+Nested classes are divided into two categories: non-static and static. Non-static nested classes are called "inner classes". Static nested classes are 
+called static "nested classes".
+
+A nested class is a member of its enclosing class. Non-static nested classes (inner classes) have access to other members of the enclosing class, even 
+if they are declared private. Static nested classes do not have access to other members of the enclosing class. 
+As a member of the OuterClass, a nested class can be declared private, public, protected, or package private.
+
+Why Use Nested Classes?
+
+- It is a way of logically grouping classes that are only used in one place: If a class is useful to only one other class, then it is logical to embed it in 
+that class and keep the two together. Nesting such "helper classes" makes their package more streamlined.
+
+- It increases encapsulation: Consider two top-level classes, A and B, where B needs access to members of A that are declared private. By hiding class B within class A, 
+A's members can be declared private and B can still access them. In addition, B itself can be hidden from the outside world.
+
+- It can lead to more readable and maintainable code.
+
+* INNER CLASSES:
+
+As with instance methods and variables, an inner class is associated with an instance of its enclosing class and has direct access to that object's methods and fields. 
+Also, because an inner class is associated with an instance, it cannot define any static members itself.
+
+An instance of InnerClass can exist only within an instance of OuterClass and has direct access to the methods and fields of its enclosing instance.
+
+OuterClass outerObject = new OuterClass();
+OuterClass.InnerClass innerObject = outerObject.new InnerClass();
+
+There are two special kinds of inner classes: local classes and anonymous classes.
+
+* LOCAL CLASSES:
+Local classes are classes that are defined in a block, which is a group of zero or more statements between balanced braces. You typically find local classes defined 
+in the body of a method.
+
+public class Example{
+    static String regularExpression = "[^0-9]";
+
+    public static void validatePhoneNumbers(String phoneNumber1, String phoneNumber2){
+        final int numberLength = 10;        // final local variable
+
+        class PhoneNumber{
+            String formattedPhoneNumber = null;
+
+            PhoneNumber(String phoneNumber){
+                String currentNumber = phoneNumber.replaceAll(regularExpression, "");  // replace all that are not numbers by "".
+
+                if(currentNumber == null) formattedPhoneNumber = null;
+                else formattedPhoneNumber = currentNumber;
+            }
+
+            public void printOriginalNumbers() {
+               System.out.println(phoneNumber1 + phoneNumber2);
+            }
+        }
+
+        PhoneNumber number1 = new PhoneNumber(phoneNumber1);
+        PhoneNumber number1 = new PhoneNumber(phoneNumber2);
+    }
+}
+
+A local class has access to the members of its enclosing class i.e PhoneNumber class has access to members of Example class.
+In addition, a local class has access to local variables. However, a local class can only access local variables that are declared final or effectively final. 
+See that we are using "numberLength" var in local class. The "numberLength" var is declared final.
+
+If you declare the local class in a method, it can access the method's parameters. See that printOriginalNumbers() of local class access to method params 
+"phoneNumber1" & "phoneNumber2".
+
+Declarations of a type of a var/method in a local class shadow declarations in the enclosing scope that have the same name.
+
+Local classes are similar to inner classes because they cannot define or declare any static members. Local classes in static methods can only refer to static 
+members of the enclosing class. Ex, our "PhoneNumber" local class has access to static "regularExpression" var. 
+
+Local classes are non-static because they have access to instance members of the enclosing block. Consequently, they cannot contain most kinds of static declarations.
+You cannot declare an interface inside a block; interfaces are inherently static.
+
+You cannot declare static initializers or member interfaces in a local class.
+
+public void sayGoodbyeInEnglish() {
+    class EnglishGoodbye {
+        public static void sayGoodbye() {      // static method. Gives "modifier 'static' is only allowed in constant variable declaration error
+            System.out.println("Bye bye");
+        }
+    }
+    EnglishGoodbye.sayGoodbye();
+}
+
+A local class can have static members provided that they are constant variables. 
+A constant variable is a variable of primitive type or a String that is declared final and initialized with a compile-time constant expression. 
+A compile-time constant expression is typically a string or an arithmetic expression that can be evaluated at compile time.
+
+public void sayGoodbyeInEnglish() {
+    class EnglishGoodbye {
+        public static final String farewell = "Bye bye";     // constant variable
+        public void sayGoodbye() {
+            System.out.println(farewell);
+        }
+    }
+    EnglishGoodbye myEnglishGoodbye = new EnglishGoodbye();
+    myEnglishGoodbye.sayGoodbye();
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* ANONYMOUS CLASSES:
+
+Anonymous classes enable you to make your code more concise. They enable you to declare and instantiate a class at the same time. They are like local classes except 
+that they do not have a name. Use them if you need to use a local class only once.
+
+public class HelloWorldAnonymousClasses {
+    interface HelloWorld {
+        public void greetSomeone(String someone);
+    }
+  
+    public void sayHello() {  
+        class EnglishGreeting implements HelloWorld {      // local class
+            public void greetSomeone(String someone) {
+                name = someone;
+                System.out.println("Hello " + name);
+            }
+        }
+      
+        HelloWorld englishGreeting = new EnglishGreeting();
+        
+        HelloWorld frenchGreeting = new HelloWorld() {        // anonymous class. Declaration & initialization at same place
+            public void greetSomeone(String someone) {
+                name = someone;
+                System.out.println("Salut " + name);
+            }
+        };          // Notice the semi-colon, this means the anon class definition is actually a statement
+
+        englishGreeting.greetSomeone("John");
+        frenchGreeting.greetSomeone("Fred");
+    }         
+}
+
+The syntax of an anonymous class expression is like the invocation of a constructor, except that there is a class definition contained in a block of code.
+
+The anonymous class expression consists of the following:
+
+- The name of the interface to implement or a class to extend. In this example, the anonymous class is implementing the "HelloWorld" interface.
+
+- Parentheses that contain the arguments to a constructor. When implementing an interface, there is no constructor, so you use an empty pair of parentheses.(see ex)
+
+An anonymous class has access to the members of its enclosing class.
+An anonymous class cannot access local variables in its enclosing scope that are not declared as final or effectively final. 
+The declaration of var/methods in anon(or local) class overrides the type of declaration of var/method of same name in enclosing class.
+
+You cannot declare static initializers or member interfaces in an anonymous class.            // Same as local class
+An anonymous class can have static members provided that they are constant variables.         // Same as local class
+
+Note that you can declare the following in anonymous classes:
+    Fields, Extra methods (even if they do not implement any methods of the supertype), Instance initializers, Local classes
+
+However, you cannot declare constructors in an anonymous class.
+
+public class HelloWorld extends Application {          // Another ex of anon class
+    public static void main(String[] args) {
+        launch(args);
+    }
+    
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Hello World!");
+        Button btn = new Button();
+        btn.setText("Say 'Hello World'");
+
+        btn.setOnAction(new EventHandler<ActionEvent>() {           // EventHandler<ActionEvent> interface contains only one method
+            @Override                                      //  Instead of implementing this method with a new class, we are using anonymous class expression.
+            public void handle(ActionEvent event) {
+                System.out.println("Hello World!");
+            }
+        });
+        
+        StackPane root = new StackPane();
+        root.getChildren().add(btn);
+    }
+}
+
+The EventHandler<ActionEvent> interface contains only one method, you can use a lambda expression instead of an anonymous class expression.
+
+Anonymous classes are ideal for implementing an interface that contains two or more methods.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* STATIC NESTED CLASS:
+
+A static nested class is associated with its outer class. A static nested class cannot directly access instance var/methods defined in its enclosing class: it can use 
+them only through an object reference.
+
+A static nested class is behaviorally a top-level class that has been nested in another top-level class for packaging convenience.
+You instantiate a static nested class the same way as a top-level class:
+
+    StaticNestedClass staticNestedObject = new StaticNestedClass();
+
+public class OuterClass {
+    String outerField = "Outer field";
+    static String staticOuterField = "Static outer field";
+
+    class InnerClass {
+        void accessMembers() {
+            System.out.println(outerField);
+            System.out.println(staticOuterField);
+        }
+    }
+
+    static class StaticNestedClass {
+        void accessMembers(OuterClass outer) {
+            System.out.println(outerField);    // Error: Cannot make a static reference to the non-static field
+            System.out.println(outer.outerField);
+            System.out.println(staticOuterField);
+        }
+    }
+
+    public static void main(String[] args) {
+        OuterClass outerObject = new OuterClass();
+        OuterClass.InnerClass innerObject = outerObject.new InnerClass();
+        innerObject.accessMembers();
+
+        StaticNestedClass staticNestedObject = new StaticNestedClass();        
+        staticNestedObject.accessMembers(outerObject);
+
+        TopLevelClass topLevelObject = new TopLevelClass();        
+        topLevelObject.accessMembers(outerObject);                
+    }
+}
+
+public class TopLevelClass {
+    void accessMembers(OuterClass outer) {     
+        System.out.println(OuterClass.outerField);   // Error: Cannot make a static reference to the non-static field
+        System.out.println(outer.outerField);
+        System.out.println(OuterClass.staticOuterField);
+    }  
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* SHADOWING:
+
+If a declaration of a type (such as a member var/parameter name) in a particular scope has the same name as another declaration in the enclosing scope, then 
+the declaration shadows the declaration of the enclosing scope. You cannot refer to a shadowed declaration by its name alone.
+
+public class ShadowTest {
+    public int x = 0;
+
+    class FirstLevel {
+        public int x = 1;
+
+        void methodInFirstLevel(int x) {
+            System.out.println(x);         // 23
+            System.out.println(this.x);    // 1, to refer to the member variable of the inner class, use "this"
+            System.out.println(ShadowTest.this.x);  // 0
+        }
+    }
+
+    public static void main(String... args) {
+        ShadowTest st = new ShadowTest();
+        ShadowTest.FirstLevel fl = st.new FirstLevel();
+        fl.methodInFirstLevel(23);
+    }
+}
+
+* SERIALIZATION
+Serialization of inner classes, including local and anonymous classes, is strongly discouraged. When the Java compiler compiles certain constructs, such as inner 
+classes, it creates synthetic constructs; these are classes, methods, fields, and other constructs that do not have a corresponding construct in the source code.
+
+Synthetic constructs enable Java compilers to implement new Java language features without changes to the JVM. However, synthetic constructs can vary among different 
+Java compiler implementations, which means that .class files can vary among different implementations as well. Consequently, you may have compatibility issues if you 
+serialize an inner class and then deserialize it with a different JRE implementation
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+*LAMBDA EXPRESSION 
+
+While implementing anon classes with only one method, we can implement the method using lambda expression.
+
+EX:
+
+public class Person {
+    public enum Sex {
+        MALE, FEMALE
+    }
+
+    String name;
+    int age;
+
+    public int getAge() {}
+}
+
+We want to filter person objects based on their age. The simplest code we can write is:
+
+APPROACH 1:
+public static void printPersonsOlderThan(List<Person> list, int age) {
+    for (Person p : list) 
+        if (p.getAge() >= age)  p.printPerson();
+}
+
+The problem with this approach is the filtering condition is explicitly defined in the method. The filtering condition could be changed in the future, more conditions
+can be introduced in the filtering processes. Would you like to change the code everywhere in the app if that happens?
+
+You can create a separate filtering class & define the filtering algorithm in it.
+
+APPROACH 2:
+public static void printPersons(List<Person> list, CheckPerson tester) {  // CheckPerson is contains algorithm for filtering
+    for (Person p : list) 
+        if (tester.test(p)) p.printPerson();
+}
+
+What if the filtering is done based on different algorithms? We can create multiple filtering classes & implement a base filtering interface.
+
+APPROACH 3:
+interface CheckPerson {
+    boolean test(Person p);
+}
+
+class oneAlgorithm implements CheckPerson {
+    public boolean test(Person p) {
+        return p.getAge() >= 18 && p.getAge() <= 25;
+    }
+}
+
+public static void printPersons(List<Person> list, CheckPerson tester) {  // CheckPerson is contains algorithm from "oneAlgorithm" class
+    for (Person p : list) 
+        if (tester.test(p)) p.printPerson();
+}
+
+This is OK but too much code. We have to create a class(different implementations) for each printPersons() method in the app. This leads to code duplication.
+We can create an anon class which implements the CheckPerson interface.
+
+APPROACH 4:
+printPersons(roster,new CheckPerson() {
+                    public boolean test(Person p) {
+                        return p.getAge() >= 18 && p.getAge() <= 25;
+                    }
+                }){
+    for (Person p : roster) 
+        if (tester.test(p)) p.printPerson();
+}
+
+As the CheckPerson interface has only 1 method, we can write it in lambda expression.
+
+APPROACH 5:
+printPersons(roster, (Person p) ->  p.getAge() >= 18 && p.getAge() <= 25){
+    for (Person p : roster) 
+        if (tester.test(p)) p.printPerson();
+}
+
+APPROACH 6: Use Standard Functional Interfaces with Lambda Expressions
+
+interface CheckPerson {        -->       |                interface Predicate<T> {
+    boolean test(Person p);              |                    boolean test(T t);
+}                                        |                }
+
+As the CheckPerson contains only one method which returns a boolean, we can substitute it for a Standard functional interface "Predicate" which does the same thing
+
+printPersonsWithPredicate(roster, p -> p.getAge() >= 18 && p.getAge() <= 25){
+    for (Person p : roster) 
+        if (tester.test(p)) p.printPerson();
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Like local and anonymous classes, lambda expressions can capture variables; they have the same access to local variables of the enclosing scope. However, unlike 
+local and anonymous classes, lambda expressions do not have any shadowing issues. Lambda expressions are lexically scoped. This means that they do not inherit any 
+names from a supertype or introduce a new level of scoping. Declarations in a lambda expression are interpreted just as they are in the enclosing environment.
+
+public static void printPersons(List<Person> roster, CheckPerson tester)
+
+public void printPersonsWithPredicate(List<Person> roster, Predicate<Person> tester)
+
+When the Java runtime invokes the method printPersons, it's expecting a data type of CheckPerson, so the lambda expression is of this type. 
+When the Java runtime invokes the method printPersonsWithPredicate, it's expecting a data type of Predicate<Person>, so the lambda expression is of this type
+
+The data type that these methods expect is called the target type. To determine the type of a lambda expression, the Java compiler uses the target type of the context 
+or situation in which the lambda expression was found.
+
+void invoke(Runnable r) {
+    r.run();
+}
+
+<T> T invoke(Callable<T> c) {
+    return c.call();
+}
+
+String s = invoke(() -> "done");
+
+Which method will be invoked in the following statement?
+
+The method invoke(Callable<T>) will be invoked because that method returns a value; the method invoke(Runnable) does not. In this case, the type of the lambda 
+expression" () -> "done"" is Callable<T>.
+
+You can serialize a lambda expression if its target type and its captured arguments are serializable. However, like inner classes, the serialization of lambda 
+expressions is strongly discouraged.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Local class: Use it if you need to create more than one instance of a class, access its constructor, or introduce a new, named type (because, for example, you need to 
+invoke additional methods later).
+
+Anonymous class: Use it if you need to declare fields or additional methods.
+
+Lambda expression:
+    - Use it if you are encapsulating a single unit of behavior that you want to pass to other code. For example, you would use a lambda expression if you want a 
+        certain action performed on each element of a collection, when a process is completed, or when a process encounters an error.
+
+    - Use it if you need a simple instance of a functional interface and none of the preceding criteria apply (for example, you do not need a constructor, a named type, 
+    fields, or additional methods).
+
+Nested class: Use it if your requirements are similar to those of a local class, you want to make the type more widely available, and you don't require access to local 
+              variables or method parameters.
+    - Use a non-static nested class (or inner class) if you require access to an enclosing instance's non-public fields and methods. Use a static nested class if you 
+      don't require this access.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* COLLECTIONS FRAMEWORK:
+
+A collection is an object that represents a group of objects (such as Vector class). A collections framework is a unified architecture for representing and manipulating 
+collections, enabling collections to be manipulated independently of implementation details. 
+
+The primary advantages of a collections framework are:
+
+    - Reduces programming effort by providing data structures and algorithms so you don't have to write them yourself.
+
+    - Increases performance by providing high-performance implementations of data structures and algorithms. Because the various implementations of each interface 
+        are interchangeable, programs can be tuned by switching implementations.
+
+    - Provides interoperability between unrelated APIs by establishing a common language to pass collections back and forth.
+
+    - Reduces the effort required to learn APIs by requiring you to learn multiple ad hoc collection APIs.
+
+    - Reduces the effort required to design and implement APIs by not requiring you to produce ad hoc collections APIs.
+
+    - Fosters software reuse by providing a standard interface for collections and algorithms with which to manipulate them.
+
+The collection framework consists of:
+
+1. Collection interfaces: Represent different types of collections, such as sets, lists, and maps. These interfaces form the basis of the framework.
+The most basic interface, java.util.Collection, has the following descendants:
+    - Set, SortedSet, NavigableSet, Queue, Deque
+
+The other collection interfaces are based on "Map" and are not true collections. However, these interfaces contain collection-view operations, which enable them to be 
+manipulated as collections. Map has the following
+    - SortedMap, NavigableMap, ConcurrentMap
+
+2. Collection Implementations:
+Classes that implement the collection interfaces typically have names in the form of <Implementation-style><Interface>
+    Set(& Map): HashSet, TreeSet, LinkedHashSet       List: ArrayList, LinkedList       Queue: ArrayDeque, LinkedList, PriorityQueue
+
+These are unsynchronized, but the Collections class contains static factories called "synchronization wrappers" that can be used to add synchronization to many 
+unsynchronized collections. All of the new implementations have fail-fast iterators, which detect invalid concurrent modification, and fail quickly.
+
+3. Concurrent Collections: Collections which allow more than 1 thread to operate. These types go beyond the synchronization wrappers:
+    Some concurrent-aware interfaces are: BlockingQueue, BlockingDeque, TransferQueue, ConcurrentMap, ConcurrentNavigableMap
+    Their implementation classes: LinkedBllocking(De)Queue, ArrayBlockingQueue, SynchronousQueue, ConcurrentHashMap
+
+4. Wrapper implementations. Add functionality, such as synchronization, to other implementations.
+
+5. Abstract implementations. Partial implementations of the collection interfaces to facilitate custom implementations.
+
+6. Algorithms. Static methods that perform useful functions on collections, such as sorting a list.
+
+Collection framework provides a set of standardized methods(name only) to operate on different collections like add(), poll(), get() etc.
+
+NOTE: Collection interface is a child interface of "Iterable". Map interface doesnt extends Collection(so doesnt extends Iterable).
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Working of HashMap:
+Why Map is not a child of Collection?
+The interfaces & classes which extends/implements Collection interface all stores elements by their values. But the Map stores elements in Key-Value pairs. So the
+methods defined in the Collection interface will no longer work with Map implementations. And according to Interface-Segregation principle from SOLID, we have to
+separate the Map interface from the Collection interface to avoid implementing unwanted methods.
+
+HashMap works on the principle of hashing — an algorithm to map object data to some representative integer value. The hashing function is applied to the key object 
+to calculate the index of the bucket in order to store and retrieve any key-value pair.
+
+Capacity is the number of buckets in the HashMap. The default initial capacity of the HashMap is 16. As the number of elements in the HashMap increases, the capacity 
+is expanded. The load factor is the measure that decides when to increase the capacity of the Map
+
+The threshold of a HashMap is approximately the product of current capacity and load factor. Rehashing is the process of re-calculating the hash code of already stored 
+entries. When the no. of entries in the hash table exceeds the threshold, the Map is rehashed so that it has approx twice the number of buckets as before.
+
+Load factor = Number of elements / Number of buckets
+
+    Lower load factor = more free buckets = less chances of collision = high performance = high space requirement.
+    Higher load factor = fewer free buckets = higher chance of collision = lower performance = lower space requirement.
+
+If the load factor exceeds a certain threshold (often set to 0.75), the hashmap becomes inefficient as the number of collisions increases. To avoid this, the hashmap 
+can be resized and the elements can be rehashed to new buckets, which decreases the load factor and reduces the number of collisions. This process is known as rehashing.

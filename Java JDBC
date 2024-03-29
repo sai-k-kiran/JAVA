@@ -1,0 +1,431 @@
+The Java JDBC API (Java Database Connectivity) enables Java applications to connect to relational databases like MySQL etc.
+The Java JDBC API is part of the core Java SE SDK, making JDBC available to all Java applications that want to use it.
+
+The Java JDBC API standardizes how to connect to a database, how to execute queries against it, how to navigate the result of such a query, and how to execute 
+updates in the database, how to call stored procedures, and how to obtain meta data from the database. By "standardizes" I mean that the code looks the same 
+across different database products. Thus, changing to another database will be a lot easier, if your project needs that in the future. 
+
+JDBC does not standardize the SQL sent to the database. The SQL is written by you, the user of the JDBC API. The SQL dialect used by the various different 
+databases will vary slightly, so to be 100% database independent, you SQL must also be 100% database independent.
+
+import java.sql.*;
+
+public class JdbcExample {
+
+    public static void main(String[] args) throws ClassNotFoundException {
+        Class.forName("org.h2.Driver");        // loading JDBC driver for H2Database. Not needed after java 6
+
+        String url      = "jdbc:h2:~/test";   //database specific url.
+        String user     = "sa";
+        String password = "";
+
+        // Properties properties = new Properties( );       // This can also be used
+        // properties.put( "user", "sa" );
+        // properties.put( "password", "" );
+
+        try(Connection connection = DriverManager.getConnection(url, user, password)) {         // Try-With-Resources block. No need to close in the finally block
+            try(Statement statement = connection.createStatement()){      // Or you can use JDBC PreparedStatement 
+                String sql = "select * from people"; 
+                try(ResultSet result = statement.executeQuery(sql)){      // access the result of the query
+                    while(result.next()) {
+                        String name = result.getString("name");
+                        long   age  = result.getLong  ("age");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* CORE JDBC COMPONENTS:
+
+1. JDBC Drivers
+A JDBC driver is a collection of Java classes that  that implement the JDBC interfaces, targeting a specific database. The JDBC interfaces comes with standard Java, 
+but the implementation of these interfaces is specific to the database which enables you to connect to a certain database. For instance, MySQL will have its own JDBC 
+driver. A JDBC driver implements a lot of the JDBC interfaces. When your code uses a given JDBC driver, it actually just uses the standard JDBC interfaces.
+
+2. Connections
+Once a JDBC driver is loaded and initialized, you need to connect to the database. You do so by obtaining a Connection to the database via the JDBC API and the 
+loaded driver. All communication with the database happens via a connection. An application can have more than one connection open to a database at a time. This 
+is actually very common. 
+
+3. Statements
+A Statement is what you use to execute queries and updates against the database. There are a few different types of statements you can use. Each statement corresponds 
+to a single query or update. 
+
+The Java JDBC API has an interface similar to the Statement called PreparedStatement. The PreparedStatement can have parameters inserted into the SQL statement, so 
+the PreparedStatement can be reused again and again with different parameter values. You cannot do that with a Statement. A Statement requires a finished SQL 
+statement as parameter.
+
+4. ResultSets
+When you perform a query against the database you get back a ResultSet. You can then traverse this ResultSet to read the result of the query. The ResultSet.next() 
+method moves to the next row in the ResultSet, if there are anymore rows. If there are anymore rows, it returns true. If there were no more rows, it will return false. 
+
+    result.getString    ("columnName");     // result.getString    (1);   You can also pass an index of the column instead, like this:
+    result.getLong      ("columnName");     // result.getLong      (2);
+    result.getInt       ("columnName");     // result.getInt       (3);
+    result.getDouble    ("columnName");     // result.getDouble    (4);
+    result.getBigDecimal("columnName");     // result.getBigDecimal(5);
+
+
+If iterating large amounts of rows, referencing the columns by their index might be faster than by their name. 
+
+* TYPES OF JDBC DRIVERS:
+1. Type 1 JDBC Driver
+A type 1 JDBC driver consists of a Java part that translates the JDBC interface calls to ODBC calls. An ODBC bridge then calls the ODBC driver of the given database. 
+Type 1 drivers are (were) mostly intended to be used in the beginning, when there were no type 4 drivers (all Java drivers).
+
+2. Type 2 JDBC Driver
+It is like a type 1 driver, except the ODBC part is replaced with a native code part instead. The native code part is targeted at a specific database product.
+
+3. Type 3 JDBC Driver
+A type 3 JDBC driver is an all Java driver that sends the JDBC interface calls to an intermediate server. The intermediate server then connects to the database 
+on behalf of the JDBC driver
+
+4. Type 4 JDBC Driver
+A type 4 JDBC driver is an all Java driver which connects directly to the database. It is implemented for a specific database product. Today, most common type.
+
+connection.commit() -> To commit a transaction.
+
+connection.setAutoCommit() -> 
+To set the the commit mode to true. In auto commit mode each single update sent to the database will be committed immediately, as if executed within its own 
+transaction. When not in auto commit mode, each database transaction must be explicitly committed by calling the Connection commit() method.
+
+connection.rollback() -> This method rolls back the operations executed within the currently ongoing transaction.
+
+Statement statement = connection.createStatement() ->  creates a JDBC Statement object. A Statement instance can be used to execute SQL queries/updates against the db.
+
+PreparedStatement preparedStatement = connection.prepareStatement(sql) -> same as above
+
+DatabaseMetaData databaseMetaData = connection.getMetaData() -> returns a JDBC DatabaseMetaData object which can be used to introspect the database
+
+* UPDATING RECORDS
+
+In order to update the database you need to use a Statement. But, instead of calling the executeQuery() method, you call the executeUpdate() method. 
+
+There are two types of updates you can perform on a database:
+    1. Update record values
+    2. Delete records
+
+The executeUpdate() method is used for both of these types of updates. 
+
+Statement statement = connection.createStatement();
+String    sql       = "update people set name='John' where id=123";
+int rowsAffected    = statement.executeUpdate(sql);   // rowsAffected tells how many records in the database were affected by the SQL statement. 
+
+Statement statement = connection.createStatement();
+String    sql       = "delete from people where id=123";
+int rowsAffected    = statement.executeUpdate(sql);
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* JDBC RESULTSET:
+
+A JDBC ResultSet contains records. Each record contains the same amount of columns, although not all columns may have a value. 
+A column can have a null value
+
+When you create a ResultSet there are three attributes you can set. These are:
+
+    1.Type
+    2. Concurrency
+    3. Holdability
+
+Statement statement = connection.createStatement(
+    ResultSet.TYPE_FORWARD_ONLY,          // TYPE
+    ResultSet.CONCUR_READ_ONLY,           // Concurrency
+    ResultSet.CLOSE_CURSORS_OVER_COMMIT   // Holdability
+   );
+
+Iterating through a Result set:
+
+while(result.next()) {                        //     while(result.next()) {        
+    result.getString    ("name");             //        result.getString    (1);        --> accessing through column index
+    result.getInt       ("age");              //        result.getInt       (2);
+    result.getBigDecimal("coefficient");      //        result.getBigDecimal(3);
+                                              //        
+    // etc.                                   //        etc.
+}                                             //    }
+
+Sometimes you do not know the index of a certain column ahead of time. For instance, if you use a "select * from" type of SQL query, you do 
+not know the sequence of the columns. 
+
+If you do not know the index of a certain column you can find the index of that column using the result.findColumn(String columnName) method
+
+int nameIndex   = result.findColumn("name");
+int ageIndex    = result.findColumn("age");
+int coeffIndex  = result.findColumn("coefficient");
+
+while(result.next()) {
+    String     name        = result.getString(nameIndex);
+    int        age         = result.getInt(ageIndex);
+    BigDecimal coefficient = result.getBigDecimal(coeffIndex);
+}
+
+RESULTSET TYPE:
+
+A ResultSet can be of a certain type. The type determines some characteristics and abilities of the ResultSet. 
+You will have to check the db if the given result set type is compatible by "DatabaseMetaData.supportsResultSetType(int type)" method, which returns true/false
+
+    1.ResultSet.TYPE_FORWARD_ONLY           // Default type
+    2. ResultSet.TYPE_SCROLL_INSENSITIVE
+    3. ResultSet.TYPE_SCROLL_SENSITIVE
+
+TYPE_FORWARD_ONLY means that the ResultSet can only be navigated forward. That is, you can only move from row 1, to row 2, to row 3 etc. You cannot move backwards 
+in the ResultSet. 
+
+TYPE_SCROLL_INSENSITIVE means that the ResultSet can be navigated (scrolled) both forward and backwards. You can also jump to a position relative to the current 
+position, or jump to an absolute position. The ResultSet is insensitive to changes in the underlying data source while the ResultSet is open. That is, if a record 
+in the db is changed by another thread or process, it will not be reflected in already opened ResulsSet of this type. 
+
+TYPE_SCROLL_SENSITIVE is same as above. The only difference is it is sensitive to changes in the underlying datasource while the result set is open. That is, if a 
+record in the database is changed by other thread or process, it will be reflected in the already opened result set of this type.
+
+- absolute() 	    Moves the ResultSet to point at an absolute position. The position is a row number passed as parameter to the absolute() method.
+- afterLast() 	    Moves the ResultSet to point after the last row in the ResultSet.
+- beforeFirst() 	Moves the ResultSet to point before the first row in the ResultSet.
+- first() 	        Moves the ResultSet to point at the first row in the ResultSet.
+- last() 	        Moves the ResultSet to point at the last row in the ResultSet.
+- next() 	        Moves the ResultSet to point at the next row in the ResultSet.
+- previous() 	    Moves the ResultSet to point at the previous row in the ResultSet.
+- relative() 	    Moves the ResultSet to point to a position relative to its current position. The relative position is passed as a parameter to the relative method, 
+                    and can be both positive and negative.
+
+- getRow() 	        Returns the row number of the current row - the row currently pointed to by the ResultSet.
+- getType() 	    Returns the ResultSet type.
+- isAfterLast() 	Returns true if the ResultSet points after the last row. False if not.
+- isBeforeFirst() 	Returns true if the ResultSet points before the first row. False if not.
+- isFirst() 	    Returns true if the ResultSet points at the first row. False if not. 
+- refreshRow() 	    Refreshes the column values of that row with the latest values from the database. 
+
+RESULTSET CONCURRENCY:
+
+The ResultSet concurrency determines whether the ResultSet can be updated, or only read. Some databases and JDBC drivers support that the ResultSet is updated, 
+but not all databases and JDBC drivers do. The DatabaseMetaData.supportsResultSetConcurrency(int concurrency) method returns true/false depending on whether the 
+given concurrency mode is supported or not
+   
+    1. ResultSet.CONCUR_READ_ONLY
+    2. ResultSet.CONCUR_UPDATABLE
+
+If a ResultSet is updatable, you can update the columns of each row in the ResultSet. You do so using the many updateXXX() methods. 
+
+    result.updateString("name", "Alex");                                 // result.updateString(1, "Alex");
+    result.updateInt("age", 55);                                         // result.updateInt(2, 55);
+    result.updateBigDecimal("coefficient", new BigDecimal("0.1323"));    // result.updateBigDecimal(3, new BigDecimal("0.1323"));
+    result.updateRow();                                                  // result.updateRow()
+
+It is when updateRow() is called that the database is updated with the values of the row. If you do not call this method, the values updated in the ResultSet are 
+never sent to the database. If you call updateRow() inside a transaction, the data is not actually committed to the database until the transaction is committed. 
+
+If the ResultSet is updatable it is also possible to insert rows into it. You do so by: 
+
+    1. ResultSet.moveToInsertRow()
+    2. update row column values
+    3. ResultSet.insertRow()
+
+result.moveToInsertRow();     // provided by JDBC(same for spring) to move to move the cursor to insert a new row
+result.updateString     (1, "Alex");
+result.updateInt        (2, 55);
+result.updateBigDecimal (3, new BigDecimal("0.1323"));
+result.insertRow();
+
+result.beforeFirst();   // Or call result.moveToCurrentRow(), cursor position back to the row we were at before we started inserting
+
+The row pointed to after calling moveToInsertRow() is a special row, a buffer, which you can use to build up the row until all column values has been set on the row. 
+
+Once the row is ready to be inserted into the ResultSet, call the insertRow() method.
+
+After inserting the row the ResultSet still pointing to the insert row. However, you cannot be certain what will happen if you try to access it, once the row has been 
+inserted. Therefore you should move the ResultSet to a valid position after inserting the new row. If you need to insert another row, explicitly call moveToInsertRow() 
+to signal this to the ResultSet. 
+
+RESULTSET HOLDABILTY:
+
+The ResultSet holdability determines if a ResultSet is closed when the commit() method of the underlying connection is called. 
+The DatabaseMetaData.supportsResultSetHoldability(int holdability) returns true/false depending on whether the given holdability mode is supported or not for a db.
+
+There are two types of holdability:
+
+    1. ResultSet.CLOSE_CURSORS_OVER_COMMIT
+    2. ResultSet.HOLD_CURSORS_OVER_COMMIT
+
+To create a holdable ResultSet, we need to specify the holdability type as the last parameter while creating a Statement. This parameter is specified after the 
+concurrency mode.
+CLOSE_CURSORS_OVER_COMMIT holdability means that all ResultSet instances are closed when conn.commit() method is called on the connection that created the ResultSet.
+
+HOLD_CURSORS_OVER_COMMIT holdability means that the ResultSet is kept open when the conn.commit() method is called on the connection that created the ResultSet.
+
+The HOLD_CURSORS_OVER_COMMIT holdability might be useful if you use the ResultSet to update values in the database. Thus, you can open a ResultSet, update rows in 
+it, call connection.commit() and still keep the same ResultSet open for future transactions on the same rows. 
+
+MySQL supports only HOLD_CURSORS_OVER_COMMIT. So, even if we use CLOSE_CURSORS_AT_COMMIT, it will be ignored.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+JDBC PREPAREDSTATEMENT:
+
+The Java JDBC PreparedStatement primary features are:
+
+    - Easy to insert parameters into the SQL statement.
+    - Easy to reuse the PreparedStatement with new parameter values.
+    - May increase performance of executed statements.
+    - Enables easier batch updates.
+
+String sql = "update people set firstname=? , lastname=? where id=?";
+
+PreparedStatement preparedStatement = connection.prepareStatement(sql);
+
+preparedStatement.setString(1, "Gary");         // insert parameters at the location of the question mark
+preparedStatement.setString(2, "Larson");
+preparedStatement.setLong  (3, 123);
+
+int rowsAffected = preparedStatement.executeUpdate();   // OR executeUpdate() to update the db
+
+Once a PreparedStatement is prepared, it can be reused after execution. Reuse a PreparedStatement by setting new values for the parameters and then execute it again.
+
+It takes time for a database to parse an SQL string, and create a query plan for it. A query plan is an analysis of how the database can execute the query in the 
+most efficient way.
+
+If you submit a new, full SQL statement for every query or update to the database, the database has to parse the SQL and for queries create a query plan. By reusing 
+an existing PreparedStatement you can reuse both the SQL parsing and query plan for subsequent queries. This speeds up query execution, by decreasing the parsing and 
+query planning overhead of each execution. There are two levels of potential reuse for a PreparedStatement.
+
+    - Reuse of PreparedStatement by the JDBC driver.
+    - Reuse of PreparedStatement by the database.
+
+The JDBC driver can cache PreparedStatement objects internally, and thus reuse the PreparedStatement objects. This may save a little of the 
+PreparedStatement creation time.
+
+The cached parsing and query plan could potentially be reused across Java applications, for instance application servers in a cluster, using the same database. 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+JDBC BATCH UPDATES
+
+A JDBC batch update is a batch of updates grouped together, and sent to the database in one batch, rather than sending the updates one by one. 
+Sending a batch of updates to the database in one go, is faster than sending them one by one, waiting for each one to finish. There is less network traffic 
+involved in sending one batch of updates (only 1 round trip), and the database might be able to execute some of the updates in parallel. The speed up compared 
+to executing the updates one by one, can be quite big. 
+
+You can batch both SQL inserts, updates and deletes. It does not make sense to batch select statements. There are two ways to execute a JDBC batch update:
+
+1. Using a Statement:
+
+    Statement statement = null;
+
+    try{
+        statement = connection.createStatement();
+
+        statement.addBatch("update people set firstname='John' where id=123");
+        statement.addBatch("update people set firstname='Eric' where id=456");
+        statement.addBatch("update people set firstname='May'  where id=789");
+
+        int[] recordsAffected = statement.executeBatch(); // array telling how many records were affected by each sql statement
+    } finally {
+        if(statement != null) statement.close();
+    }
+
+2. Using a PreparedStatement:
+    List<Person> persons = ... // get a list of Person objects from somewhere.
+
+    String sql = "update people set firstname=? , lastname=? where id=?";
+
+    PreparedStatement preparedStatement = null;
+    try{
+        preparedStatement = connection.prepareStatement(sql);
+
+        for(Person person : persons) {
+            preparedStatement.setString(1, person.getFirstName());
+            preparedStatement.setString(2, person.getLastName());
+            preparedStatement.setLong  (3, person.getId());
+
+            preparedStatement.addBatch(); // adds the parameter values to the batch internally. can add another set of values
+        }                                 //  Each set of parameters are inserted into the SQL and executed separately
+
+        int[] affectedRecords = preparedStatement.executeBatch();
+
+    }finally {
+        if(preparedStatement != null) preparedStatement.close();
+    }
+
+It is important to keep in mind, that each update added to a Statement or PreparedStatement is executed separately by the database. That means, that some of them may 
+succeed before one of them fails. All the statements that have succeeded are now applied to the database, but the rest of the updates may not be. This can result in 
+an inconsistent data in the database.
+
+To avoid this, you can execute the batch update inside a JDBC transaction. When executed inside a transaction you can make sure that either all updates are executed, 
+or none are. Any successful updates can be rolled back, in case one of the updates fail. 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+JDBC TRANSACTIONS:
+
+A transaction is a set of actions to be carried out as a single, atomic action. Either all of the actions are carried out, or none of them are. 
+
+Connection connection = ...
+try{
+    connection.setAutoCommit(false);   // set auto commit mode to false
+
+    Statement statement1 = null;
+    try{
+        statement1 = connection.createStatement();
+        statement1.executeUpdate("update people set name='John' where id=123");
+    } finally {
+        if(statement1 != null) statement1.close();
+    }
+
+
+    Statement statement2 = null;
+    try{
+        statement2 = connection.createStatement();
+        statement2.executeUpdate("update people set name='Gary' where id=456");
+    } finally {
+        if(statement2 != null) statement2.close();
+    }
+
+    connection.commit();
+} catch(Exception e) {
+    connection.rollback();
+} finally {
+    if(connection != null) connection.close();
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+JDBC CALLABLESTATEMENT:
+
+A java.sql.CallableStatement is used to call stored procedures in a database. A stored procedure is like a function or method in a class, except it lives inside 
+the db. Some db heavy operations may benefit performance-wise from being executed inside the same memory space as the database server, as a stored procedure.
+
+    CallableStatement callableStatement = connection.prepareCall("{call calculateStatistics(?, ?)}",
+        ResultSet.TYPE_FORWARD_ONLY,
+        ResultSet.CONCUR_READ_ONLY,
+        ResultSet.CLOSE_CURSORS_OVER_COMMIT
+    );
+
+    callableStatement.setString(1, "param1");
+    callableStatement.setInt(2, 123);
+        
+    callableStatement.registerOutParameter(1, java.sql.Types.VARCHAR);   // OUT paramaters, values returned instead of/or with ResultSet.
+    callableStatement.registerOutParameter(2, java.sql.Types.INTEGER);
+
+    ResultSet result = callableStatement.executeQuery(); // OR executeUpdate() to update the db
+        
+    String out1 = callableStatement.getString(1);  // First process the ResultSet before trying to access OUT params.
+    int out2 = callableStatement.getInt(2);        // for db compatibility reasons
+
+You can group multiple calls to a stored procedure into a batch update. 
+
+    CallableStatement callableStatement = connection.prepareCall("{call calculateStatistics(?, ?)}");
+
+    callableStatement.setString(1, "param1");
+    callableStatement.setInt   (2, 123);
+    callableStatement.addBatch();
+
+    callableStatement.setString(1, "param2");
+    callableStatement.setInt   (2, 456);
+    callableStatement.addBatch();
+
+    int[] updateCounts = callableStatement.executeBatch();

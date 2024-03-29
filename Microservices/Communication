@@ -1,0 +1,457 @@
+Feign Client(OpenFeign):
+
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Use RPI for inter-service communication. The client uses a request/reply-based protocol to make requests to a service.
+RPI = Remote Procedure Invocation
+
+EX:
+
+@Component
+public class RegistrationServiceProxy implements RegistrationService {
+
+    private final RestTemplate restTemplate;
+
+    @Value("${user_registration_url}")
+    private String userRegistrationUrl;
+
+    @Autowired
+    public RegistrationServiceProxy(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    @HystrixCommand(commandProperties = {
+            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "800")
+    })
+
+    @Override
+    public Either<RegistrationError, String> registerUser(String emailAddress, String password) {
+        try {
+            ResponseEntity<RegistrationBackendResponse> response = restTemplate.postForEntity(
+                    userRegistrationUrl,
+                    new RegistrationBackendRequest(emailAddress, password),
+                    RegistrationBackendResponse.class);
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                return Either.right(response.getBody().getId());
+            }
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.CONFLICT) {
+                return Either.left(DuplicateRegistrationError);
+            }
+        }
+
+        return null;
+    }
+}
+
+This pattern has the following benefits:
+
+    - Simple and familiar
+    - Request/reply is easy
+    - Simpler system since there in no intermediate broker
+
+This pattern has the following drawbacks:
+
+    - Usually only supports request/reply and not other interaction patterns such as notifications, request/async response, publish/subscribe, publish/async response
+    - Reduced availability since the client and the service must be available for the duration of the interaction
+
+This pattern has the following issues:
+
+    - Client needs to discover locations of service instances
+
+What are RestTemplate disadvantages?
+
+A server has a fixed number of threads in its thread pool and when a new request comes to the server, a thread is allocated the task to serve that request.
+The thread will make the necessary DB call to fetch the data and it will be in blocking state till the data comes fom the DB. 1 thread can process only 1
+request at a time and is blocked by that request till the response has been served. The same thread can be used again to serve another request once it is available
+
+If there are many requests to a server, all threads may go into blocking state(waiting for data from DB) and consequent request wont be served to a thread and the
+request will wait for an available thread. RestTemplate is blocking method which follows synchronous way of calling APIs. 
+
+To avoid this situation, we have to call our APIs asynchronously using reactive programming(RxJava, WebClient) Or use Open Feign from spring cloud.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+API GATEWAY:
+
+Suppose you are building an online store that uses microservices architecture pattern. The Product details data is spread across multiple services:
+
+    - Product Info Service - basic information about the product such as title, author
+    - Pricing Service - product price
+    - Order service - purchase history for product
+    - Inventory service - product availability
+    - Review service - customer reviews …
+
+How do the clients of a Microservices-based application access the individual services?
+
+- The granurality of APIs provided by microservices is often different than what client(browser, app) needs. Microservices generally provide more fine-grained
+APIs that the client needs to interact with multiple services. For displaying data on the product data page, we need to fetch data from multiple services like
+Product Info service, pricing service, order service etc. So the APIs written for these services are fined-tuned to return a portion of data that client would need
+to display whole info about a product.
+
+- Different client need different data. For example, the desktop browser version of a product details page desktop is typically more elaborate then the mobile version.
+
+- Network performance is different for different types of clients. For example, a mobile network is typically much slower and has much higher latency than a non-mobile network. And also WAN is slower than LAN. The desktop web app can make multiple requests to the backend services whereas mobile client cant
+
+- The number of service instances and their locations (host+port) changes dynamically
+
+- Partitioning into services can change over time and should be hidden from clients
+
+- Services might use a diverse set of protocols, some of which might not be web friendly
+
+SOLUTION:
+Implement an API gateway that is the single entry point for all clients. The API gateway handles requests in one of two ways. Some requests are simply proxied/routed to the appropriate service. It handles other requests by fanning out to multiple services.
+
+Rather than provide a one-size-fits-all style API, the API gateway can expose a different API for each client. For example, the Netflix API gateway runs client-specific adapter code that provides each client with an API that’s best suited to its requirements.
+
+The API gateway might also implement security, e.g. verify that the client is authorized to perform the request
+
+A variation of this pattern is the Backends for frontends pattern. It defines a separate API gateway for each kind of client(Web app, mobile app, 3rd party app etc).
+
+Using an API gateway has the following benefits:
+
+- Insulates the clients from how the application is partitioned into microservices.
+
+- Insulates the clients from the problem of determining the locations of service instances
+
+- Provides the optimal API for each client
+
+- Reduces the number of requests/roundtrips. For example, the API gateway enables clients to retrieve data from multiple services with a single round-trip. Fewer requests also means less overhead and improves the user experience. An API gateway is essential for mobile applications.
+
+- Simplifies the client by moving logic for calling multiple services from the client to API gateway
+
+- Translates from a “standard” public web-friendly API protocol to whatever protocols are used internally
+
+The API gateway pattern has some drawbacks:
+
+- Increased complexity - the API gateway is yet another moving part that must be developed, deployed and managed
+
+- Increased response time(sometimes insignificant) due to the additional network hop through the API gateway 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+REST TEMPLATE 
+
+1. Create a bean of RestTemplate in the app:
+
+@Configuration
+public class WebConfig {
+
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
+
+    // @Bean                       // builder-style API for configuring and creating RestTemplate instances
+    // public RestTemplate restTemplate(RestTemplateBuilder builder) {
+    
+    //     return builder
+    //         .setConnectTimeout(Duration.ofMillis(3000))
+    //         .setReadTimeout(Duration.ofMillis(3000))
+    //         .build();
+    // }
+}
+
+2. Receiving API Response as POJO
+
+@RestController
+public class userController {
+    long id = 1L;
+    String url = "http://localhost:8080/users/{id}";
+
+    @GetMapping("users/{id}")        
+    public ResponseEntity<User> getById(@PathVariable long id) {  // Method 1: Using getForObject()
+        User user = restTemplate.getForObject(url, User.class, id);
+        
+        // String userJson = restTemplate.getForObject(url, String.class, userid);    receiving API Response as JSON String
+    }
+
+    @GetMapping("users/{id}")
+    public ResponseEntity<User> getById(@PathVariable long id) {  // Method 2: Using getForEntity()
+        ResponseEntity<User> responseEntity = restTemplate.getForEntity(url, User.class, id);
+        User user = responseEntity.getBody();
+    }
+
+    @GetMapping("users/{id}")
+    public ResponseEntity<User> getById(@PathVariable long id) {     // Method 3: Using exchange()
+        ResponseEntity<User> responseEntity = restTemplate.exchange(
+            url, HttpMethod.GET, null, User.class, id);
+
+        User user = responseEntity.getBody();
+    }
+
+    @GetMapping("users/{id}")
+    public ResponseEntity<User> getById(@PathVariable long id) {    // Method 4: Using execute()
+        ResponseEntity<User> responseEntity = restTemplate.execute(
+            url, HttpMethod.GET, null, User.class, id);
+
+        User user = responseEntity.getBody();
+    }
+}
+
+3. HTTP POST Requests using RestTemplate
+
+@RestController
+public class userController {
+    User newUser = new User(1, "Alex", "Golan", "alex@mail.com");  // user obj should be created in each method but I am trying to save lines
+
+    @PostMapping("users")      
+    public ResponseEntity<User> create(@RequestBody User newUser) {  // Method 1: Using postForObject() 
+
+        User createdUser = restTemplate.postForObject("/users", newUser, User.class);
+    }
+
+    @PostMapping("users")  
+    public ResponseEntity<User> create(@RequestBody User newUser) {  // Method 2: Using postForLocation()
+        URI location = restTemplate.postForLocation("/users", newUser, User.class);
+    }
+
+    @PostMapping("users")  
+    public ResponseEntity<User> create(@RequestBody User newUser) {     // Method 3: Using postForEntity()
+        ResponseEntity<User> responseEntity = restTemplate.postForEntity("/users", newUser, User.class);
+
+        System.out.println("HTTP Status: " + responseEntity.getStatusCode());
+        System.out.println("Response Body: " + responseEntity.getBody());
+
+        HttpHeaders headers = responseEntity.getHeaders();
+        System.out.println("Response Headers: " + headers);
+    }
+
+    @PutMapping("users/{id}")
+    public ResponseEntity<User> update(@RequestBody User updatedUser) { 
+        User updatedUser = restTemplate.put("/users/{id}", user, User.class, Map.of("id", "1"));
+    }
+
+    @DeleteMapping("users/{id}")
+    public HttpStatus delete(@PathVariable long id) {
+        restTemplate.delete ("/users/{id}",  Map.of("id", "1"));
+    }
+}
+
+Exception Handling:
+
+RestTemplate restTemplate = new RestTemplate();
+String apiUrl = "https://api.example.com/resource";
+
+try {
+  ResponseEntity<String> responseEntity = restTemplate.getForEntity(apiUrl, String.class);
+
+  if (responseEntity.getStatusCode().is2xxSuccessful()) {
+      String responseBody = responseEntity.getBody();
+      System.out.println("Response: " + responseBody);
+  } else {
+      System.err.println("Unexpected HTTP status: " + responseEntity.getStatusCode());
+  }
+} catch (HttpClientErrorException e) {
+  if (e.getStatusCode().is4xxClientError()) {
+      System.err.println("Client error: " + e.getStatusCode() + " - " + e.getStatusText());
+      System.err.println("Response Body: " + e.getResponseBodyAsString());
+  } else {
+      System.err.println("Unexpected HTTP status: " + e.getStatusCode());
+  }
+} catch (Exception e) {
+  System.err.println("An error occurred: " + e.getMessage());
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+WEB CLIENT 
+
+Spring WebClient is a non-blocking and reactive web client for performing HTTP requests. The WebClient has been added in Spring 5 (spring-webflux module) and 
+provides the fluent functional-style API for sending HTTP requests and handling the responses.
+
+1. Create a bean for webClient instance
+
+@Configuration
+public class WebConfig {
+  @Bean
+  public WebClient webClient() {
+    WebClient webClient = WebClient.builder()
+      .baseUrl("http://localhost:3000")
+      .defaultCookie("cookie-name", "cookie-value")
+      .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+      .build();
+  }
+}
+
+@Service
+public class MyService {
+
+    private final WebClient webClient;
+
+    public MyService(WebClient webClient) {
+        this.webClient = webClient;
+    }
+
+    public Mono<Employee> createEmployee(Employee employee) {
+          Mono<Employee> employeeMono = webClient.post() /// post request, returns an employee object
+           .uri("/employees")
+           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+           .body(Mono.just(employee), Employee.class)
+           .retrieve()
+           .bodyToMono(Employee.class);
+
+        return employeeMono;
+    }
+}
+
+public void someMethod() {
+  Employee employee = new Employee(...); // Create an Employee instance
+
+  myService.createEmployee(employee)
+    .subscribe(
+      createdEmployee -> {
+        System.out.println("Employee created: " + createdEmployee);
+      },
+      error -> {
+        System.err.println("Error creating employee: " + error.getMessage());
+      }
+    );
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+WebClient retrieve() vs. exchange() APIs
+
+Both the retrieve() and exchange() methods are used for making HTTP requests, but they offer different levels of control and flexibility over the request and 
+response handling. Since Spring 5.3, the exchange() method is deprecated due to potential memory and connection leaks
+
+The retrieve() is a simplified API for common use cases where we want to send an HTTP request, receive the response, and handle it in a reactive way.
+When we call retrieve(), the request is sent, and the response is automatically processed and deserialized into a reactive type (e.g., Mono or Flux). We don’t need 
+to explicitly subscribe to the response.
+
+Mono<Employee> employeeMono = webClient.get()
+    .uri("/employees/{id}", 123)
+    .retrieve()
+    .bodyToMono(Employee.class);
+
+bodyToMono() and bodyToFlux() methods always expect a response body of a given class type. If the response status code is 4xx (client error) or 5xx (Server error) 
+i.e there is no response body then these methods throw "WebClientException". Use bodyToMono(Void.class) if no response body is expected. Helpful in DELETE operations.
+
+The exchange() API allows us to handle the request and response explicitly. It returns the ClientResponse which has all the response elements such as status, headers 
+and response body as well. With exchange(), we are responsible for subscribing to the response explicitly using subscribe(), block() or similar methods. This 
+gives us more control over when and how the request is executed.
+
+When using exchange(), we must always use any of the bodyToMono(), bodyToFlux() or toEntity() methods of ClientResponse.
+
+Mono<ClientResponse> responseMono = webClient.get()
+    .uri("/employees/{id}, 123)
+    .exchange();
+
+responseMono.subscribe(clientResponse -> {
+
+  HttpStatus statusCode = clientResponse.statusCode();     // HTTP Status
+  HttpHeaders headers = clientResponse.headers();          // HTTP Headers
+  Mono<Employee> employeeMono = clientResponse.bodyToMono(Employee.class);  // Response Body
+  // Handle the response, including error handling based on status code
+});
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Here’s an example of how to use exchangeToMono() to make a GET request with Spring WebClient and handle the response:
+
+@Service
+public class MyService {
+  private final WebClient webClient;
+
+  public MyService(WebClient webClient) {
+      this.webClient = webClient;
+  }
+
+  public Mono<Employee> fetchEmployeeById(int id) {
+    return webClient.get()
+      .uri("/employees/{id}", id)
+      .exchangeToMono(this::handleResponse);        // or use exchangeToFlux()
+  }
+
+  private Mono<Employee> handleResponse(ClientResponse response) {
+
+    if (response.statusCode().is2xxSuccessful()) {
+      return response.bodyToMono(Employee.class);
+    } 
+    else if (response.statusCode().is4xxClientError()) {
+      return Mono.error(new EmployeeNotFoundException("Employee not found"));
+    } 
+    else if (response.statusCode().is5xxServerError()) {
+      return Mono.error(new RuntimeException("Server error"));
+    } 
+    else {
+      return Mono.error(new RuntimeException("Unexpected error"));
+    }
+  }
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+GET API Example:
+
+public Flux<Employee> getAllEmployees() {
+    return webClient.get()
+      .uri("/employees")
+      .retrieve()
+      .onStatus(httpStatus -> !httpStatus.is2xxSuccessful(),
+              clientResponse -> handleErrorResponse(clientResponse.statusCode()))
+      .bodyToFlux(Employee.class)
+      .onErrorResume(Exception.class, e -> Flux.empty()); // Return an empty collection on error
+}
+
+Flux<Employee> allEmployees = employeeService.getAllEmployees();
+
+allEmployees.subscribe(employee -> {
+    System.out.println("Employee: " + employee);
+});
+
+int employeeId = 123; 
+Mono<Employee> employeeById = employeeService.getEmployeeById(employeeId);
+
+employeeById.subscribe(employee -> {
+    System.out.println("Employee by ID: " + employee);
+});
+
+POST API Example:
+
+public Mono<ResponseEntity<Employee>> createEmployee(Employee newEmployee) {
+    return webClient.post()
+      .uri("/employees")
+      .body(Mono.just(newEmployee), Employee.class)
+      .retrieve()
+      .onStatus(HttpStatus::is4xxClientError, response -> {
+        return Mono.error(new WebClientResponseException("Bad Request", response.statusCode().value(), null, null, null));
+      })
+      .onStatus(HttpStatus::is5xxServerError, response -> {
+        return Mono.error(new WebClientResponseException("Server Error", response.statusCode().value(), null, null, null));
+      })
+      .toEntity(Employee.class);
+}
+
+Employee newEmployee = new Employee(180, "Saikiran", "Active");
+
+employeeService.createEmployee(newEmployee)
+    .subscribe(responseEntity -> {
+
+        System.out.println("Status: " + responseEntity.getStatusCodeValue());
+        System.out.println("Location URI: " + responseEntity.getHeaders().getLocation());
+        System.out.println("Created New Employee: " + responseEntity.getBody());
+    });
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Spring WebClient vs. RestTemplate:
+
+RestTemplate uses the Java Servlet API, which is based on the thread-per-request model. This means that the thread will block until the web client receives the 
+response. The problem with the blocking code is due to each thread consuming some amount of memory and CPU cycles.
+Consequently, the application will create many threads, which will exhaust the thread pool or occupy all the available memory.
+
+On the other side, WebClient uses an asynchronous, non-blocking solution provided by the Spring Reactive framework. While RestTemplate uses the caller thread(not new) 
+for each event (HTTP call), WebClient will create something like a “task” for each event. Behind the scenes, the Reactive framework will queue those “tasks” and execute 
+them only when the appropriate response is available.
+
+It provides means to compose asynchronous logic through the Reactive Streams API. As a result, the reactive approach can process more logic while using fewer threads 
+and system resources, compared to the synchronous/blocking method.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Spring WebFlux configures the default memory limit for buffering data in-memory to 256KB. If this limit is exceeded in any case then we will encounter 
+DataBufferLimitException error. To reset the memory limit, configure the below property in application.properties file.
+
+    spring.codec.max-in-memory-size=1MB
+

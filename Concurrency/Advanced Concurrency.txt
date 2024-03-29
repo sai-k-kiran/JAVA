@@ -1,0 +1,596 @@
+* Difference Between Asynchronous and Multi-Threading
+
+Asynchronous programming:
+
+An asynchronous model allows multiple things to happen at the same time. More than 1 function can be run simultaneously, means when a method is called, it doesn’t
+blocks the execution flow. When the function finishes, the program knows and gets the result.
+
+In asynchronous programming, threads are used to run different tasks. Thread 2 runs independently without waiting for Thread 1 to finish its execution. When 
+both threads gets the result back, they resynchronize to combine their results.
+
+One approach to asynchronous programming is to make functions that perform a slow action and take an extra argument, a callback function. The action is started, 
+and when it finishes, the callback function is called with the result.
+
+Multithreading:
+
+Multithreading refers to the concurrent/parallel execution of more than one sequential set (thread) of instructions.
+On a single processor, multithreading gives the illusion of running in parallel. In reality, the processor is switching by using a scheduling algorithm. 
+Or, it’s switching based on a combination of external inputs (interrupts) and how the threads have been prioritized.
+
+On multiple processor cores, threads are truly parallel. Individual microprocessors cores work together to achieve the result more efficiently. There are 
+multiple parallel, concurrent tasks happening at once.
+
+A basic example of multithreading is downloading two files from two different tabs in a web browser. Each tab uses a new thread to download the requested 
+file. No tab waits for the other one to finish, they are downloading concurrently.
+
+We can see that multithreading programming is all about concurrent execution of different functions. Async programming is about non-blocking execution 
+between functions, and we can apply async with single-threaded or multithreaded programming. So, multithreading is one form of asynchronous programming.
+
+Multithreading is about workers, Asynchronous is about tasks.
+
+For large scale applications with a lot of I/O operations and different computations, using asynchronous multithreading programming flow, will utilize 
+the computation resources, and take care of non-blocking functions
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* DIFFERENCE BETWEEN USER THREADS AND DAEMON THREADS:
+User threads are high-priority threads. The JVM will wait for any user thread to complete its task before terminating it.
+
+On the other hand, daemon threads are low-priority threads whose only role is to provide services to user threads.
+
+Since daemon threads are meant to serve user threads and are only needed while user threads are running, they won’t prevent the JVM from exiting once all user 
+threads have finished their execution. That’s why infinite loops, which typically exist in daemon threads, will not cause problems, because any code, 
+including the finally blocks, won’t be executed once all user threads have finished their execution. For this reason, daemon threads are not recommended for 
+I/O tasks.
+
+However, there’re exceptions to this rule. Poorly designed code in daemon threads can prevent the JVM from exiting. For example, calling Thread.join() on 
+a running daemon thread can block the shutdown of the application.
+
+Daemon threads are useful for background supporting tasks such as garbage collection, releasing memory of unused objects and removing unwanted entries 
+from the cache. Most of the JVM threads are daemon threads.
+
+To create a daemon thread, we can do "thread.setDaemon(true)". Or we can use NextThread class which extends Thread class.
+
+    NewThread daemonThread = new NewThread();
+    daemonThread.setDaemon(true);
+    daemonThread.start();
+
+A thread inherits the daemon status of th thread that created it. ie if a user thread created another thread, it will be a user thread. Same for daemon thread.
+"main" thread is a user thread, any thread that is created inside the main method is by default a user thread.
+
+The "setDaemon()" can only be called once the thread is created & not started. If this method is called after starting the thread, IllegalThreadStateException.
+
+To check if a thread is a daemon thread, use "isDaemon()" method.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* CUSTOM THREAD POOLS IN PARALLEL STREAMS:
+
+Parallel stream by default uses the ForkJoinPool.commonPool(), a thread pool shared by the entire application. We can pass a custom thread pool when 
+processing the stream. The common thread pool is a static "ThreadPool" instance.
+
+@Test
+public void customThreadPoolMethod() throws InterruptedException, ExecutionException {
+    
+    long firstNum = 1;
+    long lastNum = 1_000_000;
+
+    List<Long> aList = LongStream.rangeClosed(firstNum, lastNum).boxed()
+      .collect(Collectors.toList());
+
+    ForkJoinPool customThreadPool = new ForkJoinPool(4);
+
+    long actualTotal = customThreadPool.submit(
+      () -> aList.parallelStream().reduce(0L, Long::sum)).get();
+ 
+    assertEquals((lastNum + firstNum) * lastNum / 2, actualTotal);  // true
+}
+
+We used the ForkJoinPool constructor with a parallelism level of 4. A good "thumb" rule of choosing parallelism level is the no. of cores of the CPU.
+
+When we create a custom thread pool object for our parallel stream, it wont be dereferenced and garbage collected once the stream has done the processing.
+Instead it will wait for new tasks to be assigned. The solution is to call "shutdown()" method on our custom thread pool.
+
+try {
+    long actualTotal = customThreadPool.submit(
+      () -> aList.parallelStream().reduce(0L, Long::sum)).get();
+    assertEquals((lastNum + firstNum) * lastNum / 2, actualTotal);
+} finally {
+    customThreadPool.shutdown();  // shtting down the thread pool
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* EXECUTORSERVICE:
+
+ExecutorService is a complete solution for asynchronous processing. It manages an in-memory queue and schedules submitted tasks based on thread availability.
+
+To use ExecutorService, we need to create one Runnable class.
+public class Task implements Runnable {
+    @Override
+    public void run() {
+        // task details
+    }
+}
+
+To create ExecutorService, use one of the factory methods of the Executors class:
+
+ExecutorService executor = Executors.newFixedThreadPool(10);    // at the time of creation, size of thread pool size is specified.
+
+ExecutorService executor = Executors.newSingleThreadExecutor(ThreadFactory threadFactory);     -->    single threaded executorService
+
+ExecutorService executor =  Executors.newCachedThreadPool(),   -->   reuses previously used Threads when they’re available
+
+ExecutorService executor =  Executors.newScheduledThreadPool();   -->   schedules commands to run after a given delay. 
+
+- Assigning Tasks to the ExecutorService:
+ExecutorService can execute Runnable and Callable tasks.
+
+Runnable runnableTask = () -> {
+    try {
+        TimeUnit.MILLISECONDS.sleep(300);
+    } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
+};
+
+Callable<String> callableTask = () -> {
+    TimeUnit.MILLISECONDS.sleep(300);
+    return "Task's execution";
+};
+
+List<Callable<String>> callableTasks = new ArrayList<>();
+callableTasks.add(callableTask);
+
+executorService.execute(runnableTask); --> execute() method is to execute a runnable or callable instance. It doesnt returns anything (void return type).
+Also can’t check the status of the executorService.
+
+Future<String> future = executorService.submit(callableTask)  --> submit() submits a Callable or a Runnable task & returns a Future type.
+
+String result = executorService.invokeAny(callableTasks);
+invokeAny() assigns a collection of tasks to an ExecutorService, causing each to run, and returns the result of a successful execution of one 
+task (if there was a successful execution).
+
+List<Future<String>> futures = executorService.invokeAll(callableTasks);
+invokeAll() assigns a collection of tasks to an ExecutorService and returns the result of all task executions as a list of Future objects.
+
+ExecutorService will not be automatically destroyed when there is no task to process. It will stay alive and wait for new work to do. This is helpful when
+tasks appear on irregular basis or task quantity is not known at compile time.
+
+It has 2 execution termination methods ->
+
+1. shutdown() =  waits until all the submitted tasks finish executing. It will stop executorService from accepting new tasks.
+2. shutdownNow() = terminates all actively executing tasks and halts the processing of waiting tasks. Doesnt guarantee that all running threads will be stopped
+at the same time. It returns a list of tasks waiting to be executed.
+
+One good way to shut down the ExecutorService (also recommended by Oracle) is to use both of these methods combined with the awaitTermination() method:
+
+executorService.shutdown();
+try {
+    if (!executorService.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+        executorService.shutdownNow();  // stops taking new tasks, waits for 800 ms
+    } 
+} catch (InterruptedException e) {
+    executorService.shutdownNow();
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+The Future interface provides a blocking method get(), which returns an actual result of the Callable task’s execution or null in the case of a Runnable task
+
+Future<String> future = executorService.submit(callableTask);
+String result = future.get();
+
+Calling get() method while the task is still running will cause execution to block until the task properly executes and the result is available.
+
+With very long blocking time, the performance of the app can degrade. If resulting data is not crucial, it can be avoided:
+
+String result = future.get(200, TimeUnit.MILLISECONDS);  --> If execution period > 200 ms, TimeoutException is thrown.
+
+ExecutorService gives the developer the ability to control the number of generated threads and the granularity of tasks that should be run by separate 
+threads. The best use case for ExecutorService is the processing of independent tasks, such as transactions or requests according to the scheme "one thread 
+for one task". fork/join was designed to speed up work that can be broken into smaller pieces recursively.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* LOCKS:
+
+Lock is a more flexible and sophisticated thread synchronization mechanism than the standard synchronized block. Lock is used to block other threads to access 
+a certain piece of code if any other thread is currently using it.
+
+Differences Between Lock and Synchronized Block - 
+
+- A synchronizedblock is fully contained within a method. We can have Lock APIs lock() and unlock() operation in separate methods.
+
+- A synchronized block doesn’t support the fairness. Any thread can acquire the lock once released, and no preference can be specified. We can 
+    achieve fairness within the Lock APIs by specifying the fairness property. It makes sure that the longest waiting thread is given access to the lock.
+
+- A thread gets blocked if it can’t get an access to the synchronized block. The Lock API provides tryLock() method. The thread acquires lock only 
+    if it’s available and not held by any other thread. This reduces blocking time of thread waiting for the lock.
+
+- A thread that is in “waiting” state to acquire the access to synchronized block can’t be interrupted. The Lock API provides a method 
+    lockInterruptibly() that can be used to interrupt the thread when it’s waiting for the lock.
+
+Let’s take a look at the methods in the Lock interface:
+
+- void lock() – Acquire the lock if it’s available. If the lock isn’t available, a thread gets blocked until the lock is released.
+
+- void lockInterruptibly() – This is similar to the lock(), but it allows the blocked thread to be interrupted and resume the execution.
+
+- boolean tryLock() – This is a nonblocking version of lock() method. It attempts to acquire the lock immediately, return true if locking succeeds.
+
+- boolean tryLock(long timeout, TimeUnit timeUnit) – This is similar to tryLock(), except it waits for given timeout before giving up trying to acquire the Lock.
+
+- void unlock() - unlocks the Lock instance. A locked instance should always be unlocked to avoid deadlock condition.
+
+ReadWriteLock interface that maintains a pair of locks, one for read-only operations and one for the write operation. The read lock may be simultaneously 
+held by multiple threads as long as there is no write.
+
+ReadWriteLock declares methods to acquire read or write locks:
+
+    - Lock readLock() returns the lock that’s used for reading.
+    - Lock writeLock() returns the lock that’s used for writing.
+
+LOCK IMPLEMANTATIONS:
+
+1. ReentrantLock:
+ReentrantLock class implements the Lock interface. It offers same functionalities as a lock acquired by a synchronized methods/blocks.
+
+public class SharedObject {
+    ReentrantLock lock = new ReentrantLock();
+    int counter = 0;
+
+    public void perform() {
+        lock.lock();
+        try {
+            count++;
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+
+We should wrap the lock() and the unlock() calls in the try-finally block to avoid the deadlock situations.
+
+2. ReentrantReadWriteLock:
+ReentrantReadWriteLock class implements the ReadWriteLock interface.
+
+- Read Lock – If no thread acquired the write lock or requested for it, multiple threads can acquire the read lock.
+- Write Lock – If no threads are reading or writing, only one thread can acquire the write lock.
+
+public class SynchronizedHashMapWithReadWriteLock {
+    Map<String,String> map = new HashMap<>();
+    ReadWriteLock lock = new ReentrantReadWriteLock();
+
+    Lock writeLock = lock.writeLock();
+
+    public void put(String key, String value) {
+        try {
+            writeLock.lock();
+            map.put(key, value);
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    public String remove(String key){
+        try {
+            writeLock.lock();
+            return map.remove(key);
+        } finally {
+            writeLock.unlock();
+        }
+    }
+}
+For both write methods, we need to surround the critical section with the write lock — only one thread can get access to it
+
+Lock readLock = lock.readLock();
+
+public String get(String key){
+    try {
+        readLock.lock();
+        return syncHashMap.get(key);
+    } finally {
+        readLock.unlock();
+    }
+}
+
+public boolean containsKey(String key) {
+    try {
+        readLock.lock();
+        return syncHashMap.containsKey(key);
+    } finally {
+        readLock.unlock();
+    }
+}
+For both read methods, we surround the critical section with the read lock. Multiple threads can get access to this section if no write operation is in progress.
+
+3. StampedLock:
+It also supports both read and write locks. Lock acquisition methods return a stamp that is used to release a lock or to check if the lock is still valid.
+
+public class StampedLockDemo {
+    Map<String,String> map = new HashMap<>();
+    private StampedLock lock = new StampedLock();
+
+    public void put(String key, String value){
+        long stamp = lock.writeLock();
+        try {
+            map.put(key, value);
+        } finally {
+            lock.unlockWrite(stamp);
+        }
+    }
+
+    public String get(String key) throws InterruptedException {
+        long stamp = lock.readLock();
+        try {
+            return map.get(key);
+        } finally {
+            lock.unlockRead(stamp);
+        }
+    }
+}
+A feature provided by StampedLock is optimistic locking. Most of the time, read operations don’t need to wait for write operation completion, and as a 
+result of this, the full-fledged read lock isn’t required.
+
+public String readWithOptimisticLock(String key) {
+    long stamp = lock.tryOptimisticRead();
+    String value = map.get(key);
+
+    if(!lock.validate(stamp)) {
+        stamp = lock.readLock();
+        try {
+            return map.get(key);
+        } finally {
+            lock.unlock(stamp);               
+        }
+    }
+    return value;
+}
+
+Working With Conditions:
+
+The Condition class provides the ability for a thread to wait for some condition to occur while executing the critical section.
+
+This can occur when a thread acquires the access to the critical section but doesn’t have the necessary condition to perform its operation. 
+For example, a reader thread can get access to the lock of a shared queue that still doesn’t have any data to consume.
+
+Java provides wait(), notify() and notifyAll() methods for thread intercommunication. Conditions have similar mechanisms, but we can also specify 
+multiple conditions:
+
+public class ReentrantLockWithCondition {
+    Stack<String> stack = new Stack<>();
+    int CAPACITY = 5;
+
+    ReentrantLock lock = new ReentrantLock();
+    Condition stackEmptyCondition = lock.newCondition();
+    Condition stackFullCondition = lock.newCondition();
+
+    public void pushToStack(String item){
+        try {
+            lock.lock();
+            while(stack.size() == CAPACITY) {
+                stackFullCondition.await();
+            }
+            stack.push(item);
+            stackEmptyCondition.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String popFromStack() {
+        try {
+            lock.lock();
+            while(stack.size() == 0) {
+                stackEmptyCondition.await();
+            }
+            return stack.pop();
+        } finally {
+            stackFullCondition.signalAll();
+            lock.unlock();
+        }
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* COUNTDOWNLATCH:
+CountDownLatch has a counter field which you can decrement as required. We can then use it to block a calling thread until it’s been counted down to zero.
+
+If we were doing some parallel processing, we could instantiate the CountDownLatch with the same value for the counter as a number of threads we want to 
+work across. Then, we could just call countdown() after each thread finishes, guaranteeing that a dependent thread calling await() will block until the 
+worker threads are finished.
+
+public class Worker implements Runnable {
+    private List<String> outputScraper;
+    private CountDownLatch countDownLatch;
+
+    public Worker(List<String> outputScraper, CountDownLatch countDownLatch) {
+        this.outputScraper = outputScraper;
+        this.countDownLatch = countDownLatch;
+    }
+
+    @Override
+    public void run() {
+        doSomeWork();
+        outputScraper.add("Counted down");
+        countDownLatch.countDown();
+    }
+}
+
+public void countDownLatchExample() throws InterruptedException {
+
+    List<String> outputScraper = Collections.synchronizedList(new ArrayList<>());
+    CountDownLatch countDownLatch = new CountDownLatch(5);
+    List<Thread> workers = Stream
+      .generate(() -> new Thread(new Worker(outputScraper, countDownLatch)))
+      .limit(5)
+      .collect(toList());
+
+      workers.forEach(Thread::start);
+      countDownLatch.await();      //  countDownLatchExample() method is waiting for "Worker" threads to finish execution.
+}
+
+If we didn’t call await(), we wouldn’t be able to guarantee the ordering of the execution of the threads.
+
+Terminating a countDownLatch early:
+
+What if a thread fails to execute and never calls the countDown() method. The thread waiting for the worker threads to finish will be waiting forever
+and the latch will never reach 0. In that case, we can use "await(long timeout, TimeUnit unit)". The await() method wont block the the thread forever.
+The thread will be eligible for scheduling when one of the below happens:
+
+    - The current thread is interrupted – then it throws an InterruptedException.
+    - The count reaches zero (then the method returns true).
+    - When the timeout elapses (then the method returns false).
+
+private static class MyRunnable implements Runnable {
+    private final CountDownLatch latch;
+    private MyRunnable(CountDownLatch latch) {
+        this.latch = latch;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        latch.countDown();
+    }
+}
+
+public static void main(String[] args) throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+
+    new Thread(new MyRunnable(latch)).start();
+    while (true) {
+        boolean result = latch.await(1, TimeUnit.SECONDS);
+
+        if (result) break;
+        else System.out.println("Latch is not open yet..");
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* CYCLIC BARRIER:
+
+A CyclicBarrier is a synchronizer(library classes for thread inter communication) that allows a set of threads to wait for each other to reach a 
+common execution point, also called a barrier. CyclicBarriers are used in programs in which we have a fixed number of threads that must wait for 
+each other to reach a common point before continuing execution.
+
+The barrier is called cyclic because it can be re-used after the waiting threads are released.
+
+The constructor of cyclic barrier takes an int as a param which denotes the no. of threads that can call "await()" on the barrier object.
+    public CyclicBarrier(int parties)
+
+The threads that need to synchronize their execution are also called parties & the thread which called "await()" has reached the barrier point and is
+waiting for other threads to reach that point.
+
+This call is synchronous and the thread calling this method suspends execution till a specified number of threads have called the same method on the barrier. 
+This situation where the required number of threads have called await(), is called tripping the barrier.
+
+Optionally, we can pass the second argument to the constructor, which is a Runnable instance. This has logic that would be run by the last thread that 
+trips the barrier:
+    public CyclicBarrier(int parties, Runnable barrierAction)
+
+EX:
+
+public class CyclicBarrierDemo {
+    private CyclicBarrier cyclicBarrier;
+    private List<List<Integer>> list = Collections.synchronizedList(new ArrayList<>());     // a synchronized list
+    private Random random = new Random();
+    private int NUM_PARTIAL_RESULTS;     // no. of results each worker thread is going to produce.
+    private int NUM_WORKERS;             // no. of worker threads
+
+    public void runSimulation(int numWorkers, int numberOfPartialResults) {
+        NUM_PARTIAL_RESULTS = numberOfPartialResults;     // 3
+        NUM_WORKERS = numWorkers;                         // 5
+
+        cyclicBarrier = new CyclicBarrier(NUM_WORKERS, new AggregatorThread());      // AggregatorThread() will run after all threads reach barrier point
+ 
+        for (int i = 0; i < NUM_WORKERS; i++) {
+            Thread worker = new Thread(new NumberCruncherThread());
+            worker.setName("Thread " + i);
+            worker.start();
+        }
+    }
+
+    public static void main(String[] args) {
+        CyclicBarrierDemo demo = new CyclicBarrierDemo();
+        demo.runSimulation(5, 3);     //   cyclic barrier with 5 threads that each produce 3 integers as a part of their computation and store in list.
+    }
+
+    class AggregatorThread implements Runnable {
+        @Override
+        public void run() {
+            int sum = 0;
+
+            for (List<Integer> threadResult : list) {
+                for (Integer partialResult : threadResult) {
+                    sum += partialResult;
+                }
+            }
+        }
+    }
+
+    class NumberCruncherThread implements Runnable {
+        @Override
+        public void run() {
+            List<Integer> partialResult = new ArrayList<>();
+
+            for (int i = 0; i < NUM_PARTIAL_RESULTS; i++) {    
+                Integer num = random.nextInt(10);
+                partialResult.add(num);
+            }
+
+            list.add(partialResult);
+            try {
+                cyclicBarrier.await();
+            } catch (InterruptedException e) {
+            } catch (BrokenBarrierException e) {
+            }
+        }
+    }
+}
+
+The list we have used is a synchronized list as the add method of the plain ArrayList isnt thread safe and multiple threads will be accessing the add() 
+method of the list here. 
+
+Once the barrier is tripped, the last thread that tripped the barrier executes the logic specified in the AggregatorThread – add all the numbers produced 
+by the 5 worker threads.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* COUNTDOWNLATCH vs CYCLIC BARRIER
+
+1. CyclicBarrier allows a number of threads to wait on each other, whereas CountDownLatch allows one or more threads to wait for a number of tasks to complete.
+That means, a thread can complete more tasks and call latch.countDown() more times. But a thread after doing its computation can call barrier.await()
+1 time only(calling more than 1 time is meaningless). So, CountDownLatch maintains the count of tasks and CyclicBarrier maintains a count of threads.
+
+CountDownLatch countDownLatch = new CountDownLatch(2);
+Thread t = new Thread(() -> {
+    countDownLatch.countDown();
+    countDownLatch.countDown();
+});
+t.start();
+countDownLatch.await();
+
+latch count became 0 here. It counted the no. of times "countDownLatch.countDown()" was called.
+
+CyclicBarrier cyclicBarrier = new CyclicBarrier(2);
+Thread t = new Thread(() -> {
+    try {
+        cyclicBarrier.await();
+        cyclicBarrier.await();    
+    } catch (InterruptedException | BrokenBarrierException e) {
+    }
+});
+t.start();
+
+Thread "t" called await() method that means it reached the barrier point. Calling await() again signifies that the thread has reached barrier point.
+It doesn’t mean anything. "cyclicBarrier" object will wait till 2 different threads have called await().
+
+2. When the barrier trips in CyclicBarrier, the count resets to its original value. CountDownLatch is different because the count never resets.
+
+EX:
+Create a countDownLatch of 7 tasks. Run a loop till 20 & at every iteration, call countDown() method. If the "latch.getCount()" > 0, count++ else do nothing.
+You will see that count will be equal to 7 coz latch doesnt resets itself after reaching 0.
+
+Run the same program but now instead of countDownLatch, use a cyclicBarrier. Call await() at each iteration. If barrier.getNumberWaiting() > 0, 
+count++ else do nothing. count will be > 7 as once the barrier trips, waiting number resets to 0.

@@ -1,0 +1,188 @@
+NOTE: In spring boot, we dont need to create EntityManagerFactory, EntityManager, Session, transaction ans all that. Just create an interface that extends
+JPARepository. To use transactions, use @Transactional annotation on class/method & @EnableTransactionManagement on Main class.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+    
+Entity class:
+
+The entity class must have no-arg constructor. It may have other constructors. The no-arg constructor must be public or private
+
+The entity class must be a top levrl class. No enum/interface must be an entity class.
+
+The entity class must not be final. No fields/methods inside a entity class must be final. Remember that load() method returns a proxy object. 
+
+If an entity must be passed by value as detached object(through network), the entity class must implement Serializable.
+
+Both abstract & concrete classes can be entities. Entities may extend non-entities/entities. And Non-entities may extend entity class.
+
+The @Id field must exist in an entity class even if the db table doesnt contain a primary key.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+We can implement our Generation strategy for primary key auto increment. Fro that, we have to implement "IdentifierGenerator" class provided by hibernate.
+Why? We want our key to be implemented by some cryptographic algorithm(or something like that), in that case, we have to create a custom generator class
+for our primary key.
+
+public class UUIDGen implements IdentifierGenerator{
+    @Override
+    public Object generate(SharedSessionContractImplementor implementor, Object o){
+        return sign(UUID.randomUUID.toString());
+    }
+}
+
+private String sign(String s){        // Example
+    try{
+        KeyPairGenerator kg = KeyPairGenerator.getInstance("RSA");
+        kg.initialize(2048);
+        KeyPair kp = kg.generateKeyPair();
+        PrivateKey pk = kp.getPrivate();
+
+        Signature sg = Signature.getInstance("SHA256withRSA");
+        sg.initSign(pk);
+        sg.update(s.getBytes());
+        byte[] res = sg.sign();
+
+        return s + "." + Base64.getEncoder().encodeToString(res);
+    }
+    catch(Exception e){
+
+    }
+}
+
+In our entity class:
+
+@Entity
+@Table
+public class Employee{
+    @Id
+    @GenericGenerator(name = "UUIDGen", type = UUIDGen.class)   // custom generator class
+    @GeneratedValue(generator = "UUIDGen")                     // use custom class instead of a strategy
+    @Column(length = 500)
+    private String id;
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Composite Key:
+
+@Entity
+@IdClass(ProductKey1.class)
+public class Product{
+
+    @Id
+    private String code;    // candidate for the composite key, name here & in ProductKey.class shoukd be same
+
+    @Id
+    private long number;    // candidate for the composite key
+}
+
+1. First Method:
+
+class ProductKey1 implements Serializable{   // implements Serializable
+    private String code;   
+
+    private long number;  
+
+    public String getCode(){
+        return code;
+    }
+    public void setCode(String code){
+        this.code = code
+    }
+    // implement equals() & hashcode() for finding a row in db using composite key. Product p = em.find(Product.class, id)
+}
+
+trx.begin();   // transaction begin
+
+Product p = new Product();
+p.setCode("ABC");
+p.setNumber(123);
+
+em.save(p);   // hibernate will combine code & number fields to create a composite key.
+
+trx.commit();
+
+2. Second Method:
+
+@Embeddable   // This allows us to embed an object of this class in our Product class
+class ProductKey2 implements Serializable{   // implements Serializable
+    private String code;   
+
+    private long number;  
+
+    public String getCode(){
+        return code;
+    }
+    // implement equals() & hashcode()
+} 
+
+@Entity
+public class Product{
+
+    @EmbededId
+    private ProductKey2 id;
+
+    // ..
+}
+
+trx.begin();
+
+ProductKey2 id = new ProductKey2();
+id.setCode("ABC");
+id.setNumber(123);
+
+Product p = new Product();
+p.setId(id);
+
+trx.commit();
+
+Both the methods generate same row in the db.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Hibernate handles persisting any changes to objects in the session when the session is flushed. When the entity instance is in the persistent state, all changes 
+that you make to the mapped fields of this instance will be applied to the corresponding database records upon flushing the Session or commiting the transaction, even
+if you dont call save() or update() method after making any change in the persistent instance.
+The persistent instance can be thought of as “online”, whereas the detached instance has gone “offline” and is not monitored for changes.
+
+It is important to understand that all of the methods (persist, save, update, merge, saveOrUpdate) do not immediately result in the corresponding SQL UPDATE or 
+INSERT statements. The actual saving of data to the database occurs on committing the transaction or flushing the Session.
+
+update(): if you are sure that the session does not contains an already persistent instance with the same identifier,then use update to save the data in hibernate.
+When we call update method on detached instance, it will give exception org.hibernate.NonUniqueObjectException
+
+merge(): if you want to save your modifications at any time with out knowing about the state of an session, then use merge() in hibernate. When we call merge method 
+on detached instance, it will update it with updated value.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* HIBERNATE ENTITY MANAGER:
+
+EntityManager is part of the Java Persistence API. Chiefly, it implements the programming interfaces and lifecycle rules defined by the JPA specification.
+we can access the Persistence Context by using the APIs in EntityManager. There are two types of EntityManager: Container-Managed and Application-Managed.
+
+1. Container-Managed EntityManager
+
+Here, the container injects the EntityManager in our enterprise components. The container creates the EntityManager from the EntityManagerFactory for us:
+
+@PersistenceContext
+EntityManager entityManager;
+
+This also means the container is in charge of beginning the transaction, as well as committing or rolling it back.
+Similarly, the container is responsible for closing the EntityManager, so it’s safe to use without manual cleanups. Even if we try to close a container-managed 
+EntityManager, it should throw an IllegalStateException.
+
+2. Application-Managed EntityManager
+
+The lifecycle of the EntityManager is managed by the application. In fact, we’ll manually create the EntityManager, as well as manage the lifecycle of it.
+
+EntityManagerFactory emf = Persistence.createEntityManagerFactory("my-persistence-unit");
+EntityManager em = emf.createEntityManager();
+
+The "my-persistence-unit" is the name of the persistence.xml file in src/resources/WEB-INF. 
+    <persistence-unit name="my-persistence-unit" ...>
+        <decription...
+
+The EntityManagerFactory instances, and Hibernate’s SessionFactory instances, are thread-safe. So it’s completely safe in concurrent contexts to write.
+On the other hand, the EntityManager instances aren’t thread-safe, and are meant to be used in thread-confined environments. This means that each thread 
+should obtain its instance, work with it, and close it at the end.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+

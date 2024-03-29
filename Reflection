@@ -1,0 +1,215 @@
+Java Reflection is a process of examining or modifying the behavior of a classes, interfaces, fields or methods at run time.
+The java.lang.Class class provides many methods that can be used to get metadata, examine and change the run time behavior of a class.
+
+It is mainly used in IDE, debuggger and test tools.
+
+To reflect a class in java, we need to create an object of "Class". After that, we can use this class to gather information regarding the methods, fields, and 
+constructors that are present in a class.
+
+To create a "Class" object:
+
+1. Class carClass = Class.forName("Car");
+
+2.  Car c1 = new Car();
+
+    Class obj = c1.getClass();
+
+3. Class carClass = Car.class;
+
+public void getDeclaredFieldsFromClass() {
+    Object car = new Car();
+    Field[] fields = car.getClass().getDeclaredFields();   // we can get the declared field names in "Car" class
+}
+
+public class Car extends Vehicle {
+  public void display() {
+    System.out.println("Car goes fast");
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    try {
+      Car c1 = new Car();
+      Class object = c1.getClass();             //  use Class.forName("org.practice.Vehicle.Car") mostly
+
+      System.out.println("Name is => " + object.getName());
+      System.out.println("Simple Name is => " + object.getSimpleName());
+
+
+      String m = Modifier.toString(object.getModifiers());   // object.getModifiers() returns an int. "Modifier" class converts int modifier to String
+      System.out.println("Modifier is => " + m);
+
+      System.out.println("Superclass is => " + object.getSuperclass().getName());
+    }
+
+    catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}
+
+OP:
+Name is => org.practice.Vehicle.Car     //  fully qualified class name including the package
+Simple Name => Car
+Modifier is =>  public
+Superclass is => Vehicle
+
+int carModifiers = object.getModifiers();
+
+Modifier.isPublic(carModifiers);
+Modifier.isAbstract(carModifiers);
+
+Package pkg = object.getPackage();  // get package  --> org.practice.Vehicle
+
+Class carSuperClass = object.getSuperclass();   // Vehicle is the super class of Car
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+INSPECTING CONSTRUCTORS:
+
+class Car {
+  public Car() {       // 1st constructor
+  }
+
+  private Car(int model) {      // private parameterized constructor
+  }
+}
+
+Car c = new Car();
+Class obj = c.getClass();
+
+Constructor[] cons = obj.getDeclaredConstructors(); // you can use getConstructors() too
+
+Constructor<?> cons1 = obj.getConstructor();   // gets 1st constructor
+
+Constructor<?> cons1 = obj.getConstructor(Integer.class);   // gets 2nd constructor
+
+for (Constructor c : cons) {
+    System.out.println("Constructor Name is => " + c.getName());
+
+    String m = Modifier.toString(c.getModifiers());
+    System.out.println("Modifier is => " + m);
+
+    System.out.println("Parameters are => " + c.getParameterCount());
+}
+
+OP:
+Constructor Name is => Car      // 1st constructor
+Modifier is => public     
+Parameters are => 0        
+
+Constructor Name is = Car       // private constructor 
+Modifier is => private    
+Parameters are => 1
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+INSPECTING FIELDS:
+
+public static void main(String[] args) {
+    try {
+      Car c1 = new Car();
+
+      Class obj = c1.getClass();
+
+      Field[] fields = obj.getFields();
+
+      Field f1 = obj.getField("type");
+      f1.set(c1, "SUV");
+
+      Field f2 = obj.getDeclaredField("colour");     // private field
+
+      f2.setAccessible(true);           // allowing modifications to the private field
+
+      f2.set(c1, "Navy Blue");          // c1 is the car object
+
+      String typeVal = (String) f1.get(c1);
+      System.out.println("Value is => " + typeVal);
+
+      String m1 = Modifier.toString(f1.getModifiers());
+      System.out.println("Modifier are => " + m1);    // public
+
+      String m2 = Modifier.toString(f2.getModifiers());
+      System.out.println("Modifier are => " + m2);    // private
+    } 
+    catch (Exception e) {
+      e.printStackTrace();
+    }
+}
+
+OP:
+SUV
+public
+private
+
+For a static field, we dont need the instance of a class:
+
+Class carClass = Class.forName("Car");
+Field field = carClass.getField("CATEGORY");
+
+System.out.println(field.get(null));
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+INSPECTING METHODS:
+
+With Java reflection, we can invoke methods at runtime and pass them their required parameters, just like we did for constructors. Similarly, we can also invoke 
+overloaded methods by specifying parameter types of each.
+
+The "getMethods()" method returns an array of all public methods of the class and superclasses.
+
+Car c1 = new Car();
+Class object = c1.getClass();
+
+Method[] allMethods = object.getMethods();     // we can use getDeclaredMethods() too
+
+for (Method m : allM) {
+    System.out.println("Method Name is => " + m.getName());            // method name
+
+    int modi = m.getModifiers();
+    System.out.println("Modifiers are => " + Modifier.toString(modi)); // mathod modifier
+
+    System.out.println("Return Types is => " + m.getReturnType());     // return type of method
+} 
+
+Method driveMethod = object.getClass().getDeclaredMethod("drive");     // drive is the method name in Car class
+Method driveMethod2 = object.getClass().getDeclaredMethod("drive", Integer.class); // overloaded method
+
+int res = (int)driveMethod.invoke(c1)      // invoking the drive method, c1 is the car object
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Using reflection, one can break the principles of encapsulation. It is possible to access the private methods and fields of a class using reflection. 
+Thus, reflection may leak important data to the outside world, which is dangerous. For example, if one access the private members of a class and sets 
+null value to it, then the other user of the same class can get the NullReferenceException, and this behaviour is not expected.
+
+Another demerit is the overhead in performance. Since the types in reflection are resolved dynamically, JVM (Java Virtual Machine) optimization cannot 
+take place. Therefore, the operations performed by reflections are usually slow.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Different way to create objects in java:
+
+1. Using "new" keyword     --> Car c1 = new Car();
+
+2. Using "newInstance()"   --> 
+    Class carClass = Class.forName("Car");
+    Car c1 = (Car)carClass.newInstance();
+
+3. Using clone --> Car c2 = (Car)c1.clone()
+
+4. Using deserialization  -->
+
+    Car c;
+
+    FileInputStream f = new FileInputStream("file.txt");
+    ObjectInputStream ois new ObjectInputStream(f);
+
+    c = (Car)ois.readObject();
+
+5. Using "newInstance()" from Constructor class --> 
+
+    Constructor<Car> con = Car.class.getDeclaredConstructor();
+
+    Car c3 = con.newInstance();

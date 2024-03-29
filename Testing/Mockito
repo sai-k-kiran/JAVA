@@ -1,0 +1,740 @@
+MOCKING:
+Mocking is a process of developing the objects that act as the mock or clone of the real objects. In other words, mocking is a testing technique where mock objects are used instead of real objects for testing purposes. Mock objects provide a specific (dummy) output for a particular (dummy) input passed to it.
+
+The mocking technique is not only used in Java but also used in any object-oriented programming language. There are many frameworks available in Java for mocking, but Mockito is the most popular framework among them.
+
+To mock objects, you need to understand the three key concepts of mocking i.e. stub, fake, and mock. Some of the unit tests involve only stubs, whereas some involve fake and mocks.
+
+1. Stub: Stub objects hold predefined data and provide it to answer the calls during testing. They are referred to as a dummy object with a minimum number of methods required for a test. It also provides methods to verify other methods used to access the internal state of a stub, when necessary. Stub object is generally used for state verification.
+
+2. Fake: Fake are the objects that contain working implementations but are different from the production one. Mostly it takes shortcuts and also contains the simplified version of the production code.
+
+3. Mock: Mock objects act as a dummy or clone of the real object in testing. They are generally created by an open-source library or a mocking framework like Mockito, EasyMock, etc. Mock objects are typically used for behavior verification.
+
+NEED FOR MOCKING:
+
+- If we want to test a component that depends on the other component, but it is under development. It is generally used when working in a team and parts are divided between several team-mates. In this case, mocking plays an essential role in the testing of that component. Without mocking, we need to wait for the completion of the required elements for testing.
+
+- If the real components perform slow operations while dealing with database connections or another complex read/ write operation. Sometimes the database queries can take 10, 20, or more seconds to execute. In such cases, we require mock objects to perform testing, and it can be done via mocking.
+
+- If there is an infrastructure concern that makes the testing impossible. It is very similar to the first case. For example, when we create a connection to the database, some issues related to configurations occur. It requires mocking for creating mock components to provide unit testing.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+MOCKITO:
+Mockito is a Java-based mocking framework used for unit testing of Java application. It internally uses the Java Reflection API to generate mock objects for a specific interface. Mock objects are referred to as the dummy or proxy objects used for actual implementations.
+
+The main purpose of using the Mockito framework is to simplify the development of a test by mocking external dependencies and use them in the test code. As a result, it provides a simpler test code that is easier to read, understand, and modify
+
+Methods:
+
+1. mock():
+It is used to create mock objects of a given class or interface. Mockito contains five mock() overloaded methods with different arguments. When we didn't assign anything to mocks, they will return default values.
+
+2. when():
+It enables stubbing methods. It should be used when we want to mock to return specific values when particular methods are called. In simple terms, "When the XYZ() method is called, then return ABC." It is mostly used when there is some condition to execute.
+
+    <T> when(T methodCall)
+
+3. verify():
+The verify() method is used to check whether some specified methods are called or not. In simple terms, it validates the certain behavior that happened once in a test. It is used at the bottom of the testing code to assure that the defined methods are called.
+
+Mockito framework keeps track of all the method calls with their parameters for mocking objects. After mocking, we can verify that the defined conditions are met or not by using the verify() method. This type of testing is sometimes known as behavioral testing. It checks that a method is called with the right parameters instead of checking the result of a method call.
+
+4. spy():
+It is used to partially mock an object. When using the spy method, there exists a real object, and spies or stubs are created of that real object. If we don't stub a method using spy, it will call the real method behavior. The main function of the spy() method is that it overrides the specific methods of the real object. One of the functions of the spy() method is it verifies the invocation of a certain method.
+
+5. reset():
+The Mockito reset() method is used to reset the mocks. It is mainly used for working with the container injected mocks. 
+It's better to create new mocks rather than using reset() method. That is why the reset() method is rarely used in testing. 
+
+6. verifyNoMoreInteractions():
+It is used to check that any of the given mocks have any unverified interactions. We can use this method after verifying all the mock, to make sure that nothing else was invoked on the mocks. It also detects the unverified invocations that occur before the test method, for example, in setup(), @Before method, or the constructor.
+
+7. verifyZeroInteractions();
+It verifies that no interaction has occurred on the given mocks. It also detects the invocations that have occurred before the test method, for example, in setup(), @Before method or the constructor.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ANNOTATIONS:
+
+1. @Mock: It is used to mock the objects that helps in minimizing the repetitive mock objects. It makes the test code and verification error easier to read as parameter names (field names) are used to identify the mocks. The @Mock annotation is always used with the @RunWith annotation.
+
+    @Mock  
+    ToDoService servicemock;  
+
+2. @RunWith: It is a class-level annotation. It is used to keep the test clean and improves debugging. It also detects the unused stubs available in the test and initialize mocks annotated with @Mock annotation.
+
+    @RunWith(MockitoJUnitRunner.class)   // MockitoJUnitRunner class is used to check that all the mocks are created and autowired
+    public class ToDoBusinessMock {  
+        .....  
+    } 
+
+3. @InjectMocks: It marks a field or parameter on which the injection should be performed. It allows shorthand mock and spy injections and minimizes the repetitive mocks and spy injection. In Mockito, the mocks are injected either by setter injection, constructor injection, and property injection
+
+    @InjectMocks  
+    ToDoBusiness business;  
+
+4. @Captor: It allows the creation of a field-level argument captor. It is used with the Mockito verify() method to get the values passed when a method is called
+
+    @Captor  
+    ArgumentCaptor<String> argumentCaptor;  
+
+5. @Spy - It allows the creation of partially mock objects. In other words, it allows shorthand wrapping of the field instances in a spy object.
+
+    @Spy      
+    ArrayList<String> arraylistSpy;  
+
+@RunWith(MockitoJUnitRunner.class)  
+public class ToDoBusinessMock {  
+      
+    @Mock  
+    ToDoService servicemock;   // mock of Service interface
+      
+    @InjectMocks  
+    ToDoBusiness business;   
+      
+    @Captor  
+    ArgumentCaptor<String> argumentCaptor;  
+      
+    @Spy  
+    ArrayList<String> arraylistSpy;  
+       
+     @Test   
+    public void deleteTodosusing_BDD() {   
+        List<String> combinedlist = Arrays.asList("Use Hibernate Java", "Use Hibernate Core", "Use Hibernate", "Use Spring MVC");  
+        
+        given(servicemock.getTodos("dummy")).willReturn(combinedlist);  
+            
+        arraylistSpy.add("Mockito1");  
+        arraylistSpy.add("Mockito2");  
+            
+        business.delete("dummy");  
+            
+        verify(arraylistSpy).add("Mockito1");  
+        verify(arraylistSpy).add("Mockito2");  
+
+        verify(servicemock, times(1)).deleteTodos("Use Spring MVC");  
+        verify(servicemock, never()).deleteTodos("Use Hibernate Java");  
+        verify(servicemock, never()).deleteTodos("Use Hibernate");  
+            
+        assertEquals(2, arraylistSpy.size());  
+     }  
+       
+    @Test   
+    public void deleteTodosusing_BDD_usingArgumentCaptor() {   
+        List<String> combinedlist = Arrays.asList("Use Hibernate Java", "Use Hibernate Core", "Use Hibernate", "Use Spring MVC");  
+            
+        given(servicemock.getTodos("dummy")).willReturn(combinedlist);  
+    
+        business.deleteTodosNotRelatedToHibernate("dummy");  
+
+        then(servicemock).should().deleteTodos(argumentCaptor.capture());  
+        assertThat(argumentCaptor.getValue(), is("Use Spring MVC"));  
+    }  
+}  
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ARGUMENTMATCHERS:
+
+    doReturn("Flower").when(flowerService).analyze("poppy");
+“Flower” is returned only when the analyze() method of FlowerService receives the String “poppy”.
+
+If we need to respond to a wider range of values or unknown values, we can configure our mocked methods with argument matchers:
+
+    when(flowerService.analyze(anyString())).thenReturn("Flower");
+
+Now, because of the anyString argument matcher, the result will be the same no matter what value we pass to analyze. ArgumentMatchers allow us flexible 
+verification or stubbing.
+
+If a method has more than one argument, we can’t just use ArgumentMatchers for only some of the arguments. Mockito requires that we provide all arguments 
+either by matchers or exact values.
+    when(flowerService.isABigFlower("poppy", anyInt())).thenReturn(true);       --> Wrong approach
+
+To fix this and keep the String name “poppy” as desired, we’ll use eq matcher:
+    when(flowerService.isABigFlower(eq("poppy"), anyInt())).thenReturn(true);
+
+Let’s run the test to confirm this:
+    when(flowerService.isABigFlower(eq("poppy"), anyInt())).thenReturn(true);
+
+    Flower flower = new Flower("poppy", 15);
+
+    Boolean response = flowerController.isABigFlower(flower);
+    assertThat(response).isTrue();
+
+- We can’t use them as a return value; we require an exact value when stubbing calls.
+- We can’t use argument matchers outside of verification or stubbing.
+
+String orMatcher = or(eq("poppy"), endsWith("y"));  --> Wrong approach, "or" is a logical operator provided by Mockito AdditionalMatchers.
+
+verify(flowerService).analyze(or(eq("poppy"), endsWith("y")));  --> Correct
+
+Custom Argument Matcher:
+
+Creating our own matcher allows us to select the best possible approach for a given scenario and produce high-quality tests that are clean and maintainable.
+
+For ex, we can have a MessageController that delivers messages. It’ll receive a MessageDTO, and from that, it’ll create a Message that MessageService will deliver.
+
+    MessageDTO messageDTO = new MessageDTO();
+    messageDTO.setFrom("me");
+    messageDTO.setTo("you");
+    messageDTO.setText("Hello, you!");
+
+    messageController.createMessage(messageDTO);
+
+    verify(messageService, times(1)).deliverMessage(any(Message.class)); 
+
+Verify that "messageService" class is created using mock & "deliverMessage()" is called passing the messageDTO as Message.
+
+But in this way, we cant validate the data in the messageService class "Message" is same as messageDTO. For that, we have to create our custom arg matcher:
+
+public class MessageMatcher implements ArgumentMatcher<Message> {
+
+    private Message left;
+
+    // constructors
+
+    @Override
+    public boolean matches(Message right) {
+        return left.getFrom().equals(right.getFrom()) &&
+                left.getTo().equals(right.getTo()) &&
+                left.getText().equals(right.getText()) &&
+                right.getDate() != null && right.getId() != null;
+    }
+}
+
+messageController.createMessage(messageDTO);
+
+Message message = new Message();
+message.setFrom("me");
+message.setTo("you");
+message.setText("Hello, you!");
+
+verify(messageService, times(1)).deliverMessage(argThat(new MessageMatcher(message)));
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+EX:
+ToDoBusiness.java:
+
+public class ToDoBusiness {  
+  
+    public ToDoService doService;    // Service interface
+  
+    public ToDoBusiness(ToDoService doService) {  
+        this.doService = doService;  
+    }  
+      
+    public List<String> getTodosforHibernate(String user) {  
+          
+        List<String> hibernatelist = new ArrayList<String>();  
+        List<String> Combinedlist = doService.getTodos(user);  
+          
+        for(String todo: Combinedlist) {  
+            if(todo.contains("Hibernate")) {  
+                hibernatelist.add(todo);  
+            }  
+        }  
+          
+        return hibernatelist;  
+        }  
+}  
+
+The "ToDoBusiness" class has a dependency on "ToDoService" class. If we want to test the "getTodosforHibernate()", we would need to mock the ToDoService class instead
+of spinning up the whole interface. 
+
+    @Test  
+    public void testusing_Mocks() {  
+        ToDoService doService = mock(ToDoService.class);  
+           
+        List<String> combinedlist = Arrays.asList(" Use Core Java ", " Use Spring Core ", " Use Hibernate ", " Use Spring MVC ");  
+        when(doService.getTodos("dummy")).thenReturn(combinedlist);  
+          
+        ToDoBusiness business = new ToDoBusiness(doService);  
+      
+        List<String> alltd = business.getTodosforHibernate("dummy");   
+
+        assertEquals(1, alltd.size());  
+    }  
+
+mock(ToDoService.class) creates a mock object of ToDoService interface which will contain all the methods in that interface.
+when(doService.getTodos("dummy")).thenReturn(combinedlist) --> means when we call getTodos() method, return combined list. The "getTodos()" return list of todos 
+for a user. So our mock object needs to return same type of result when we call "getTodos()".
+
+EX: Mocking a List class
+
+    @Test  
+    public void testList_ReturnsSingle_value() {  
+        List mocklist = mock(List.class);  
+        when(mocklist.size()).thenReturn(1);  
+  
+        assertEquals(1, mocklist.size());   // true  
+    }  
+
+    @Test   
+    public void testList_Returns_MultipleValues() {    
+        List mocklist = mock(List.class);  
+        when(mocklist.size()).thenReturn(1).thenReturn(2).thenReturn(3);  
+
+        when(mocklist.get(0)).thenReturn("Mockito");  
+            
+        assertEquals(1, mocklist.size());   
+        assertEquals(2, mocklist.size());  
+        assertEquals(3, mocklist.size());  
+
+        assertEquals("Mockito", mocklist.get(0));          
+    }  
+
+    @Test
+    public void testList_Argument_Matchers() {  
+        List<String> mocklist = mock(List.class);  
+  
+        when(mocklist.get(Mockito.anyInt())).thenReturn("Mockito");  // Mockito.anyInt() is an argument matcher
+          
+        assertEquals("Mockito", mocklist.get(0));  
+        assertEquals("Mockito", mocklist.get(1));   
+    }
+
+EX of verify():
+We added a method "deleteTodos(String todo)" in our ToDoService interface.
+
+public class ToDoBusiness {  
+    public ToDoService doService;  
+  
+    public ToDoBusiness(ToDoService doService) {  
+        this.doService = doService;  
+    }  
+          
+    public void delete(String user) {    
+        List<String> Combinedlist = doService.getTodos(user);  
+          
+        for(String todos:Combinedlist) {  
+            if(!todos.contains("Hibernate")) {  
+                doService.deleteTodos(todos);  
+            }  
+        }  
+    }  
+}
+
+public class ToDoBusinessMock {  
+      
+    @Test  
+    public void deleteTodosusing_BDD() {     
+        ToDoService todoService = mock(ToDoService.class);  
+            
+        List<String> combinedlist = Arrays.asList("Use Hibernate Java", "Use Hibernate Core", "Use Hibernate", "Use Spring MVC");  
+            
+        given(todoService.getTodos("dummy")).willReturn(combinedlist);  
+            
+        ToDoBusiness business = new ToDoBusiness(todoService);  
+
+        business.delete("dummy");  
+ 
+        verify(todoService).deleteTodos("Use Spring MVC");  
+    }  
+} 
+
+EX of spy():
+    @Test  
+    public void test() {    
+        List spyArrayList = spy(ArrayList.class);  
+        assertEquals(0, spyArrayList.size());  
+  
+        spyArrayList.add("Mockito");  
+        assertEquals(1, spyArrayList.size());  
+    }  
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+ARGUMENTCAPTOR:
+
+It is used to capture argument values for further assertions. We use argument captor with the methods like verify() or then() to get the values passed when a 
+specific method is invoked. This is especially useful when we can’t access the argument outside of the method we’d like to test.
+
+T capture()                                 - It is used to capture the method arguments.
+ArgumentCaptor<U> forClass(Class<S>clazz)   - It is used to build a new ArgumentCaptor.
+List<T> getAllValues()                      - It is used to return all the captured values.
+T getValue()                                - It is used to return all the captured values of the argument.
+
+    @Test   
+    public void deleteTodosusing_BDD_usingArgumentCaptor() {  
+        
+        ArgumentCaptor<String> argumentCaptor = ArgumentCaptor.forClass(String.class);  
+
+        ToDoService todoService = mock(ToDoService.class);  
+            
+        List<String> combinedlist = Arrays.asList("Use Hibernate Java", "Use Hibernate Core", "Use Hibernate", "Use Spring MVC");  
+        
+        given(todoService.getTodos("dummy")).willReturn(combinedlist);    //  same as when("...").then("...")
+            
+        ToDoBusiness business = new ToDoBusiness(todoService);  
+
+        business.delete("dummy");  
+  
+        then(todoService).should().deleteTodos(argumentCaptor.capture());  
+        assertThat(argumentCaptor.getValue(), is("Use Spring MVC"));   
+    }
+
+For example, consider an EmailService class with a send method that we’d like to test:
+
+    public class EmailService {
+        private DeliveryPlatform platform;
+
+        public EmailService(DeliveryPlatform platform) {
+            this.platform = platform;
+        }
+
+        public void send(String to, String subject, String body, boolean html) {
+            Format format = Format.TEXT_ONLY;
+            if (html) {
+                format = Format.HTML;
+            }
+            Email email = new Email(to, subject, body);
+            email.setFormat(format);
+            platform.deliver(email);
+        }
+    }
+
+Setup the unit test:
+
+    @ExtendWith(MockitoExtension.class)
+    class EmailServiceUnitTest {
+
+        @Mock
+        DeliveryPlatform platform;
+
+        @InjectMocks
+        EmailService emailService;
+
+        @Captor
+        ArgumentCaptor<Email> emailCaptor;  // argument captor
+
+        @Test
+        void whenDoesSupportHtml_expectHTMLEmailFormat() {
+            String to = "info@baeldung.com";
+            String subject = "Using ArgumentCaptor";
+            String body = "Hey, let'use ArgumentCaptor";
+
+            emailService.send(to, subject, body, true);
+
+            verify(platform).deliver(emailCaptor.capture());
+            Email value = emailCaptor.getValue();
+            assertThat(value.getFormat()).isEqualTo(Format.HTML);
+        }
+    }
+
+Avoid stubbing:
+Although we can use an ArgumentCaptor with stubbing, we should generally avoid doing so. To clarify, in Mockito, this generally means avoiding using an 
+ArgumentCaptor with Mockito.when. With stubbing, we should use an ArgumentMatcher instead.
+
+Ex without argumentCaptor:
+    Credentials credentials = new Credentials("baeldung", "correct_password", "correct_key");
+    when(platform.authenticate(eq(credentials))).thenReturn(AuthenticationStatus.AUTHENTICATED);
+
+    assertTrue(emailService.authenticatedSuccessfully(credentials));
+
+Same ex with argumentCaptor:
+
+    Credentials credentials = new Credentials("baeldung", "correct_password", "correct_key");
+    when(platform.authenticate(credentialsCaptor.capture())).thenReturn(AuthenticationStatus.AUTHENTICATED);
+
+    assertTrue(emailService.authenticatedSuccessfully(credentials));
+    assertEquals(credentials, credentialsCaptor.getValue());
+
+In contrast to the first test, notice how we have to perform an extra assert on the last line to do the same as eq(credentials).
+
+Finally, notice how it isn’t immediately clear what credentialsCaptor.capture() refers to. This is because we have to create the captor outside the line we use 
+it on, reducing readability. We dont know what we are trying to capture
+
+Reduced defect localization:
+
+If "emailService.authenticatedSuccessfully" doesn’t call "platform.authenticate", we’ll get an exception:
+
+    org.mockito.exceptions.base.MockitoException: 
+    No argument value was captured!
+
+This is because our stubbed method hasn’t captured an argument. However, the real issue is not in our test itself but in the actual method we are testing.
+If the "platform.authenticate" isnt called by "emailService.authenticatedSuccessfully", param passed to "platform.authenticate" wont be captured. This doesnt 
+mean that the "platform.authenticate" has some bug, but somthing is wrong with "emailService.authenticatedSuccessfully".
+
+In other words, it misdirects us to an exception in the test, whereas the actual defect is in the method we are testing.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+BDDMOCKITO:
+
+BDD encourages writing tests in a natural, human-readable language that focuses on the behavior of the application. It defines a clearly structured way of writing 
+tests following three sections (Arrange, Act, Assert):
+
+    - given some preconditions (Arrange)
+    - when an action occurs (Act)
+    - then verify the output (Assert)
+
+The Mockito library is shipped with a BDDMockito class which introduces BDD-friendly APIs. This API allows us to take a more BDD friendly approach arranging 
+our tests using given() and making assertions using then().
+
+The traditional mocking in Mockito is performed using when(obj).then*() in the Arrange step. Later, interaction with our mock can be validated using verify() 
+in the Assert step.
+
+BDDMockito provides BDD aliases for various Mockito methods, so we can write our Arrange step using given (instead of when), likewise, we could write our Assert 
+step using then (instead of verify).
+
+Using Mockito:
+    when(phoneBookRepository.contains(momContactName))
+    .thenReturn(false);
+    
+    phoneBookService.register(momContactName, momPhoneNumber); // register() method will call the insert() method of repository class
+    
+    verify(phoneBookRepository)               // verify that "phoneBookRepository" object is created using mock and its insert() method is called 
+    .insert(momContactName, momPhoneNumber);   // with arguments - momContactName, momPhoneNumber. 
+
+Using BDDMockito:
+    given(phoneBookRepository.contains(momContactName))
+    .willReturn(false);
+    
+    phoneBookService.register(momContactName, momPhoneNumber);
+    
+    then(phoneBookRepository)
+    .should()
+    .insert(momContactName, momPhoneNumber);
+
+Let’s try to test the PhoneBookService where we’ll need to mock the PhoneBookRepository:
+    public class PhoneBookService {
+        private PhoneBookRepository phoneBookRepository;
+
+        public void register(String name, String phone) {
+            if(!name.isEmpty() && !phone.isEmpty() && !phoneBookRepository.contains(name)) {
+                phoneBookRepository.insert(name, phone);
+            }
+        }
+
+        public String search(String name) {
+            if(!name.isEmpty() && phoneBookRepository.contains(name)) {
+                return phoneBookRepository.getPhoneNumberByContactName(name);
+            }
+            return null;
+        }
+    }
+
+    given(phoneBookRepository.contains(momContactName))
+    .willReturn(true);
+
+    given(phoneBookRepository.getPhoneNumberByContactName(momContactName))
+    .will((InvocationOnMock invocation) ->                  // return a dynamic result based on the input:
+        invocation.getArgument(0).equals(momContactName) ? momPhoneNumber : null);
+
+    phoneBookService.search(momContactName);
+
+    then(phoneBookRepository)
+    .should()
+    .getPhoneNumberByContactName(momContactName);
+
+Throwing an Exception:
+
+    given(phoneBookRepository.contains(xContactName)).willReturn(false);
+
+    willThrow(new RuntimeException())
+    .given(phoneBookRepository)
+    .insert(any(String.class), eq(tooLongPhoneNumber));
+
+    try {
+        phoneBookService.register(xContactName, tooLongPhoneNumber);
+        fail("Should throw exception");
+    } catch (RuntimeException ex) { }
+
+    then(phoneBookRepository)
+    .should(never())
+    .insert(momContactName, tooLongPhoneNumber);
+
+The above test method suggests that when we try to insert "tooLongPhoneNumber" into repository class, it should throw a RuntimeException.
+We exchanged the positions of given and will*, that’s mandatory in case we’re mocking a method that has no return value. 
+We used argument matchers like (any, eq) to provide a more generic way of mocking based on criteria rather than depending on a fixed value.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+MOCKING AN INTERFACE WITH A DEFAULT METHOD:
+
+public interface JobService {
+    Optional<JobPosition> findCurrentJobPosition(Person person);   // abstract method
+    
+    default boolean assignJobPosition(Person person, JobPosition jobPosition) {    // default method
+        if(!findCurrentJobPosition(person).isPresent()) {  // this method uses the un implemented (abstract) method
+            person.setCurrentJobPosition(jobPosition); 
+            
+            return true;
+        } else  return false;
+    }
+}
+
+To test above interface, we would create a mocked version of "JobService" interface then tell the Mockito to return a known value from the call to the
+abstract(un implemented) method  and call the real method when assignJobPosition() is called:
+
+    public class JobServiceUnitTest {
+ 
+        @Mock
+        private JobService jobService;   // mocked version of JobService
+
+        @Test
+        public void givenDefaultMethod_whenCallRealMethod_thenNoExceptionIsRaised() {
+            Person person = new Person();
+
+            when(jobService.findCurrentJobPosition(person))
+                .thenReturn(Optional.of(new JobPosition()));
+
+            doCallRealMethod().when(jobService)
+            .assignJobPosition(
+                Mockito.any(Person.class), 
+                Mockito.any(JobPosition.class)
+            );
+
+            assertFalse(jobService.assignJobPosition(person, new JobPosition()));
+        }
+    }
+
+Testing an Optional<T> method:
+
+    public class UnemploymentServiceImpl implements UnemploymentService {
+ 
+        private JobService jobService;
+        
+        // ... constructor
+        @Override
+        public boolean personIsEntitledToUnemploymentSupport(Person person) {
+            Optional<JobPosition> optional = jobService.findCurrentJobPosition(person);
+            
+            return !optional.isPresent();
+        }
+    }
+
+    public class UnemploymentServiceImplUnitTest {
+ 
+        @Mock
+        private JobService jobService;
+
+        @InjectMocks
+        private UnemploymentServiceImpl unemploymentService;
+
+        @Test
+        public void givenReturnIsOfTypeOptional_whenMocked_thenValueIsEmpty() {
+            Person person = new Person();
+
+            when(jobService.findCurrentJobPosition(any(Person.class)))   // this line is not necessary in mockito version >= 2
+            .thenReturn(Optional.empty());
+            
+            assertTrue(unemploymentService.personIsEntitledToUnemploymentSupport(person));
+        }
+    }
+
+Testing a stream:
+
+    public interface JobService {
+        Stream<JobPosition> listJobs(Person person);
+    }
+
+    public class UnemploymentServiceImpl implements UnemploymentService {
+        @Override
+        public Optional<JobPosition> searchJob(Person person, String searchString) {
+            return jobService.listJobs(person)
+            .filter((j) -> j.getTitle().contains(searchString))
+            .findFirst();
+        }
+    }
+
+    public class UnemploymentServiceImplUnitTest {
+ 
+        @Test
+        public void givenReturnIsOfTypeStream_whenMocked_thenValueIsEmpty() {
+            Person person = new Person();
+            when(jobService.listJobs(any(Person.class))).thenReturn(Stream.empty());  // we could drop this line in mockito version >= 2
+                                                                            // because now Mockito will return an empty Stream on mocked methods by default
+            assertFalse(unemploymentService.searchJob(person, "").isPresent());
+        }
+    }
+
+Combination of lambda and ArgumentMatcher:
+Before Java 8, we needed to create a class that implemented ArgumentMatcher, and write our custom rule in the matches() method. With Java 8, we can replace 
+the inner class with a simple lambda expression:
+
+    public class ArgumentMatcherWithLambdaUnitTest {
+        @Test
+        public void whenPersonWithJob_thenIsNotEntitled() {
+            Person peter = new Person("Peter");
+            Person linda = new Person("Linda");
+            
+            JobPosition teacher = new JobPosition("Teacher");
+
+            when(jobService.findCurrentJobPosition(
+            ArgumentMatchers.argThat(p -> p.getName().equals("Peter"))))
+            .thenReturn(Optional.of(teacher));
+            
+            assertTrue(unemploymentService.personIsEntitledToUnemploymentSupport(linda));
+            assertFalse(unemploymentService.personIsEntitledToUnemploymentSupport(peter));
+        }
+    }
+
+
+If we wanted to simulate calls to the listJobs() method in order to make it return a Stream containing a single JobPosition if the Person‘s name is 
+“Peter”, and an empty Stream otherwise:
+
+    public class CustomAnswerWithLambdaUnitTest {
+        @Before
+        public void init() {
+            when(jobService.listJobs(any(Person.class))).then((i) ->
+            Stream.of(new JobPosition("Teacher"))
+            .filter(p -> ((Person) i.getArgument(0)).getName().equals("Peter")));
+        }
+    }
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+- The mock() method allows us to create a mock object of a class or an interface. We can then use the mock to stub return values for its methods and verify if they were called.
+
+    @Test
+    public void givenCountMethodMocked_WhenCountInvoked_ThenMockedValueReturned() {
+        UserRepository localMockRepository = Mockito.mock(UserRepository.class);
+        Mockito.when(localMockRepository.count()).thenReturn(111L);
+
+        long userCount = localMockRepository.count();
+
+        Assert.assertEquals(111L, userCount);
+        Mockito.verify(localMockRepository).count();
+    }
+
+- @Mock annotation is a shorthand for the Mockito.mock() method. It’s important to note that we should only use it in a test class. Unlike the mock() method, we need to enable Mockito annotations to use this annotation. We can do this either by using the "MockitoJUnitRunner" to run the test, or by calling the MockitoAnnotations.initMocks() method explicitly.
+
+    @RunWith(MockitoJUnitRunner.class)
+    public class MockAnnotationUnitTest {
+        
+        @Mock
+        UserRepository mockRepository;
+        
+        @Test
+        public void givenCountMethodMocked_WhenCountInvoked_ThenMockValueReturned() {
+            Mockito.when(mockRepository.count()).thenReturn(123L);
+
+            long userCount = mockRepository.count();
+
+            Assert.assertEquals(123L, userCount);
+            Mockito.verify(mockRepository).count();
+        }
+    }
+
+@Mock makes it easier to find the problem mock in case of a failure, as the name of the field appears in the failure message
+
+- We can use the @MockBean to add mock objects to the Spring application context. The mock will replace any existing bean of the same type in the application context.
+
+If no bean of the same type is defined, a new one will be added. This annotation is useful in integration tests where a particular bean, like an external service, needs to be mocked. To use this annotation, we have to use SpringRunner to run the test:
+
+    @RunWith(SpringRunner.class)
+    public class MockBeanAnnotationIntegrationTest {
+        
+        @MockBean
+        UserRepository mockRepository;
+        
+        @Autowired
+        ApplicationContext context;
+        
+        @Test
+        public void givenCountMethodMocked_WhenCountInvoked_ThenMockValueReturned() {
+            Mockito.when(mockRepository.count()).thenReturn(123L);
+
+            UserRepository userRepoFromContext = context.getBean(UserRepository.class);
+            long userCount = userRepoFromContext.count();
+
+            Assert.assertEquals(123L, userCount);
+            Mockito.verify(mockRepository).count();
+        }
+    }
+
+When we use the annotation on a field, the mock will be injected into the field, as well as being registered in the application context.

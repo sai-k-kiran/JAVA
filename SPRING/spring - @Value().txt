@@ -1,0 +1,160 @@
+Like .env in react, applications.properties file is there in spring boot for env variables.
+
+application.properties file is a default properties file inside src/main/resources directory and it is auto detected by spring. For any other properties file,
+we have to use @PropertySource("classpath:foo.properties") annotation on top of a java class where we are gonna use the env variables inside foo.properties file.
+
+To use the env vars in the .properties file, use @Value({$"var name"}). For ex:
+    @Value( "${jdbc.url}" )
+    private String jdbcUrl;   --> Here jdbcUrl will be the value of "jdbc.url" in the properties file in @PropertySource().
+
+From spring 3.1, we can obtain the value of env variables using the Environment API:
+    @Autowired
+    private Environment env;
+    ...
+    dataSource.setUrl(env.getProperty("jdbc.url"));
+
+If we need to target different environment vars, there’s a built-in mechanism for that in Boot.
+Create a .properties file in the src/main/resources directory and then set a Spring profile with the same environment name.
+
+If there are env vars with name "staging..", we can create a properties file like "application-staging.properties" and write all the staging env vars inside that.
+
+If there are env vars with same name in different properties file, the env var from the same profile name will take precedence. For ex:
+There are env var "staging.database.url" in both appliaction.properties & application-staging.properties and we didnt explicitly specified the properties file in the
+@PropertySource() annotations, then the env var from application-staging.properties will be considered as "staging.database.url" is environment specific to 
+application-staging.properties file.
+
+Same is for testing. The src/test/resources directory is checked during a test run for a properties file. 
+You can specify a properties file using @TestPropertySource("/foo.properties") Annotation.
+
+You can specify a env var inside the @TestPropertySource() annotation like @TestPropertySource(properties = {"foo=bar"})
+    @Value("${foo}")
+    private String foo;
+
+    System.out.println(foo)  // prints "bar".
+
+If we want to inject a value of a bean into a field(a variable), then we can do that via @Value() annotation.
+Suppose there is a bean "MyBean" with a field "name = "sai", then:
+    @Value("#{MyBean.name}")
+    private Integer myName;
+
+    System.out.println(myName)  // prints "sai".
+
+We can also use the @Value annotation to inject a Map property.
+First, define the property in the {key: value} form in properties file.
+
+valuesMap={key1: '1', key2: '2', key3: '3'} --> defined in somefile.properties
+    @Value("#{${valuesMap}}")
+    private Map<String, Integer> valuesMap;
+
+To get a specific key from the key ->
+    @Value("#{${valuesMap.key1}}")
+    private Integer valuesKey1;
+
+    System.out.println(valuesKey1)  // prints 1
+
+If the key doesnt exist -->
+    @Value("#{${valuesMap}['unknownKey']}")
+    private Integer unknownMapKey;  
+
+    System.out.println(unknownMapKey)  // prints null
+
+We can set default values of keys that might not keys unknownMap={key1: '1', key2: '2'} --> defined in somefile.properties
+@Value("#{${unknownMap}}")
+private Map<String, Integer> unknownMap;    // key1: '1', key2: '2'
+
+    @Value("#{${valuesMap}['Key5'] ?: 5}")
+    private Integer unknownKey;
+
+unknownKey will be set to 5 if Key5 is null or it will be set to the value that the "Key5" key contains.
+
+If we want to set only those values from map which fulfills some condition
+    @Value("#{${valuesMap}.?[value > '1']}")
+    private Map<String, Integer> map;
+
+"map" will have those key-value pairs which has value > 1.
+
+And we can map all the properties from a .properties file
+    @Value("#{systemProperties}")
+    private Map<String, String> systemPropertiesMap;  --> contains all the vars(properties) frm .properties file as key-value pairs.
+
+--------------------------------------------------------------------------------------------------------------------
+Using @Value With Setter Injection:
+
+    @Component
+    @PropertySource("classpath:values.properties")
+    public class CollectionProvider {
+
+        private List<String> values = new ArrayList<>();
+
+        @Autowired
+        public void setValues(@Value("#{'${listOfValues}'.split(',')}") List<String> values) {
+            this.values.addAll(values);
+        }
+    }
+
+Using @Value With Constructor Injection:
+
+    @Component
+    @PropertySource("classpath:values.properties")
+    public class PriorityProvider {
+
+        private String priority;
+
+        @Autowired
+        public PriorityProvider(@Value("${priority:normal}") String priority) {
+            this.priority = priority;
+        }
+
+    }
+
+Using @Value With Records: 
+
+    @Component
+    @PropertySource("classpath:values.properties")
+    public record PriorityRecord(@Value("${priority:normal}") String priority) {}
+--------------------------------------------------------------------------------------------------------------------
+
+Similar thing can be achived using @SpringBootTest(properties = {"foo=bar"}, classes = SpringBootPropertiesTestApplication.class).
+
+You can make an object using properties inside ".properties" file. Like:
+
+    database.url=jdbc:postgresql:/localhost:5432/instance
+    database.username=foo
+    database.password=bar
+
+    @ConfigurationProperties(prefix = "database")
+    public class Database { 
+        String url;                --> jdbc:postgresql:/localhost:5432/instance
+        String username;           --> foo
+        String password;           --> bar
+    }
+
+This will make "Database" and maps the properties values with the varaiables of the "Database" class.
+
+appl.yml files do not support the @PropertySource annotation, so if we need to use this annotation, it would constrain us to using a appl.properties file.
+
+Importing Additional Configuration Files:
+Before spring 2.4.0, we have to mention the additional properties file before running the application as env vars or using command line args.
+
+In the new version, we can use the spring.config.import property within the application.properties or application.yml file to easily include additional files. 
+This property supports some interesting features:
+
+-> adding several files or directories
+-> the files can be loaded either from the classpath or from an external directory
+-> indicating if the startup process should fail if a file is not found, or if it’s an optional file
+-> importing extensionless files
+
+spring.config.import=classpath:additional-application.properties,
+  classpath:additional-application[.yml],
+  optional:file:./external.properties,
+  classpath:additional-application-properties/
+
+We can provide values for properties(env vars in .properties file) via command line args.
+java -jar app.jar --property="value"
+
+java -Dproperty.name="value" -jar app.jar  --> -Dproperty.name="value" is a system property so we have to write it before "-jar".
+
+For random values of properties:
+random.number=${random.int}
+random.long=${random.long}
+random.uuid=${random.uuid}

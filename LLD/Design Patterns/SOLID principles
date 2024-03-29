@@ -1,0 +1,413 @@
+SINGLE RESPONSIBITY PRINCIPLE:
+
+A module(set of functions/class/package/source code etc) should have a reason to change by only 1 actor.
+
+class Employee{
+    public long calculateSalary(){
+        getRegularHours();
+        ......
+    }
+    public long calculateHours(){
+        getRegularHours();
+        ......
+    }
+
+    public int getRegularHours();
+    saveEmpData();
+}
+
+In above example, the "calculateSalary" and "calculateHours" method both use "getRegularHours" method. The implementation of "getRegularHours" method may cater 
+to only one method. This means a change in "getRegularHours" method will cause a change in both methods. This breaks teh single resposibility principle.
+
+One method to solve this is to use facade design pattern and second method is to break the class according to the methods.
+We can create separate methods which calculates salary and hours and both have their own implementation. These both classes doesnt depend on any other method.
+Change in one class doesnt cause other class to change.
+
+class Menu{
+    long itemName;
+    boolean canTakeAway;
+    int amount;
+    int discount;
+}
+
+class Bill{
+    List<Customer> list;
+    TimeStamp time;
+
+    long calculateAmountPayable();
+    void printBill();
+    void saveBill();
+}
+
+Suppose the database schema is changed and the functionality of saving the bill is altered. An exta column is added in bill table in database. That means our "Bill"
+class has to change. We have to change every instance where this bill class is used like constructor of other objects etc. This will cause a problem of refactoring. 
+To avoid this problem, we can create a separate class "storeBill" for storing the bill. That way if any change occurs in the bill class, the implementation of 
+the "storeBill" class only has to change.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+OPEN/CLOSED PRINCIPLE:
+
+- An entity should be open for extension but closed for modification.
+- Extend functionality by adding new code instead of changing existing code.
+- Separate the behaviors so that system can be easily extended but never broken.
+- Goal: Get to a point where you never break the core of the system.
+
+EX:
+
+We have a class that accepts payments from different modes like Paypal, credit card, Wire transfer etc. If we create a class and implement methods for each of 
+the payment mode. Inside the class where we are using the payment methods, we could use if-else statements for different payment modes.
+
+class PaymentModes{
+    long PayPal(int money){
+        .....
+    }
+
+    long CreditCard(int money){
+        .....
+    }
+
+    long WireTRansfer(int money){
+        .....
+    }
+    ...
+}
+
+class Bill{
+    long generateBill(String paymentMode){
+        if(paymentMode == "PayPal"){
+            ....
+        }
+        else if(paymentMode == "Credit Card"){
+            .....
+        }
+        else if(.....)
+    }
+}
+
+Suppose, we added a new payment mode to our system and want to write code for it, we have to add its method in the Payment class and add an extra else if statement
+where we are gonna use it. This violates opn/closed principle coz we are modifying "Bill" class.
+
+What we can do instead is we can create an interface "PayableInterface" which has an abstracyt method "pay()" and we implement this interface using different 
+classes for each of the payment mode.
+
+interface PayableInterface{
+    public long pay(....){
+
+    }
+}
+
+class PayPalMode implements PayableInterface{
+    @Override
+    public long pay(...){
+        ....
+    }
+}
+class CreditCardMode implements PayableInterface{
+    @Override
+    public long pay(...){
+        ....
+    }
+}
+class WireTransferMode implements PayableInterface{
+    @Override
+    public long pay(...){
+        ....
+    }
+}
+
+We are gonna use payment modes in our "PaymentFactory" class:
+
+class PaymentFactory{
+    public long initializePayment(PayableInterface paymentMode){
+        if (paymentMode == null) {
+            throw new InvalidParameterException("Cannot perform operation");
+        }
+        paymentMode.pay()
+    }
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+LISKOVS SUBSTITUTION PRINCIPLE:
+
+Substitutabilty is a principle in OOP statign that in a program if "S" is a subtype of "T", then objects of type "T" maybe replaced with objects of type "S". 
+That means an objects of type "T" can be substituted with an object of subtype "S" without altering an desirable properties of "T".
+
+LSP is a particular definition of subtyping relation called string behavioral subtyping. It is semantic rather than syntactic relation because it intends to
+guarantee semantic inter operability of types in a hierarchy.
+
+In simple terms, if a class(say "Snail") is a child of a class(say "Animal") and the Animal class has a method "speak()". As Snail is a child class of Animal,
+it will inherit "speak()" method. But in real world, snails dont speak. So we were to replace "Animal" class with "Snail", our program will break as "Snail" 
+has a "speak()" method but in actual Snail class shouldn't have that method. This is true if we are honoring real world object's properties(A real snail cant speak
+but an imaginary one can do.)
+
+NOTE: This principle tells us that inheritance is not a "is-a" relation rather it is a "is-a-specialization-of" relation. In above example, snail is an animal 
+but according to this principle, we cant substitute "Snail" class in place of "Animal" class.
+
+EX:
+
+public class Vehicle{
+    public Integer wheels(){
+        return 2;
+    }
+
+    public boolean hasEngine(){
+        return true;
+    }
+}
+
+public class Car extends Vehicle{
+    @Override
+    public Integer wheels(){
+        return 4;
+    }
+}
+
+public class Bike extends Vehicle{
+}
+
+public class Cycle extends Vehicle{
+    @Override
+    public boolean hasEngine(){
+        return null;
+    }
+}
+
+public static void main(String[] args){
+    List<Vehicle> list = new ArrayList<>();
+    list.add(new Car());
+    list.add(new Bike());
+    list.add(new Cycle());   // when we try to print its hasEngine() method's return value, it will throw a NullPointerException.
+
+    for(Vehicle vehicle : list)
+        System.out.println(vehicle.hasEngine().toString());
+}
+
+To solve this, we have to create create another class that extends "Vehicle" class which has "hasEngine()" method and remove "hasEngine()" method of parent
+"Vehicle" class. 
+
+public class Vehicle{
+    public Integer wheels(){
+        return 2;
+    }
+}
+
+public class EngineVehicle{
+    public boolean hasEngine(){
+        return true;
+    }
+}
+
+public class Car extends EngineVehicle{
+    @Override
+    public Integer wheels(){
+        return 4;
+    }
+}
+
+public class Bike extends EngineVehicle{
+}
+
+public class Cycle extends Vehicle{
+    @Override
+    public boolean hasEngine(){
+        return null;
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+INTERFACE SEGREGATION PRINCIPLE:
+
+The goal of this principle is to reduce the side effects of using larger interfaces by breaking application interfaces into smaller ones. It’s similar to 
+the Single Responsibility Principle, where each class or interface serves a single purpose.
+
+Precise application design and correct abstraction is the key behind the Interface Segregation Principle.
+
+EX:
+
+public interface Payment { 
+    void initiatePayments();
+    Object status();
+    List<Object> getPayments();
+}
+
+public class BankPayment implements Payment {
+
+    @Override
+    public void initiatePayments() {
+       // ...
+    }
+
+    @Override
+    public Object status() {
+        // ...
+    }
+
+    @Override
+    public List<Object> getPayments() {
+        // ...
+    }
+}
+
+In future, we could have new features there’s a need to add a "LoanPayment" service. This service is also a kind of Payment but has a few more operations.
+
+public interface Payment {
+ 
+    // original methods
+    ...
+    void intiateLoanSettlement();   // adding new methods to existing interface
+    void initiateRePayment();
+}
+
+public class LoanPayment implements Payment {
+
+    @Override
+    public void initiatePayments() {             // This method is not needed in this class
+        throw new UnsupportedOperationException("This is not a bank payment");
+    }
+
+    @Override
+    public Object status() {
+        // ...
+    }
+
+    @Override
+    public List<Object> getPayments() {
+        // ...
+    }
+
+    @Override
+    public void intiateLoanSettlement() {
+        // ...
+    }
+
+    @Override
+    public void initiateRePayment() {
+        // ...
+    }
+}
+
+As our interface has new methods, every class implementing it should have to override methods inside the interface. The problem is, implementing them is unwanted 
+and could lead to many side effects. Here, the LoanPayment implementation class has to implement the initiatePayments() without any actual need for this.
+We have intentionally polluted the interface and violated the principle
+
+Inside out interface, "status()" and "getPayments()" methods are used by every implementation so we should separate these 2 methods. And 2 more interfaces
+that extends "Payment" interface.
+
+public interface Payment {
+    Object status();
+    List<Object> getPayments();
+}
+
+public interface Bank extends Payment {
+    void initiatePayments();
+}
+
+public interface Loan extends Payment {
+    void intiateLoanSettlement();
+    void initiateRePayment();
+}
+
+public class LoanPayment implements Loan {
+    // overrides/implements all the methods in "Loan" interface only
+}
+
+public class BankPayment  implements Bank {
+    // overrides/implements all the methods in "Bank" interface only.
+}
+
+The "LoanPayment" & "BankPayment" class doesnt implement unwanted methods now. So the interfaces dont violate this principle.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+DEPENDENCY INVERSION PRINCIPLE:
+
+High-level modules, which provide complex logic, should be easily reusable and unaffected by changes in low-level modules, which provide utility features. 
+To achieve that, you need to introduce an abstraction that decouples the high-level and low-level modules from each other.
+
+The Dependency Inversion Principle consists of two parts:
+
+    1. High-level modules should not depend on low-level modules. Both should depend on abstractions.
+    2. Abstractions should not depend on details. Details should depend on abstractions.
+
+An important detail of this definition is, that high-level and low-level modules depend on the abstraction. The design principle does not just change the 
+direction of the dependency, it splits the dependency between the high-level and low-level modules by introducing an abstraction between them.
+
+If you consequently apply the Open/Closed Principle and the Liskov Substitution Principle to your code, it will also follow the Dependency Inversion Principle.
+
+EX:
+Suppose there are 2 kinds of coffee machines -> A basic one which prepares filter coffee and a premium one which prepares different types of coffee like
+espresso.
+As the 2 machines have some similar functions(making filter coffee) and different functions(making espresso) we have to segregate coffee machines based on
+th functions performed by them.
+
+public interface CoffeeMachine {   --> for basic coffee machines
+    Coffee brewFilterCoffee();
+}
+
+public interface EspressoMachine {   --> for premium coffee machines
+    Coffee brewEspresso();
+}
+
+public class BasicCoffeeMachine implements CoffeeMachine {
+
+    @Override
+    public Coffee brewFilterCoffee() {
+        // get the coffee
+    }
+
+    public void addGroundCoffee(CoffeeSelection sel, GroundCoffee newCoffee) throws CoffeeException {
+
+    } 
+}
+
+public class PremiumCoffeeMachine implements CoffeeMachine, EspressoMachine {
+    @Override
+    public Coffee brewEspresso() {
+       // brew an espresso
+    }
+
+    @Override
+    public Coffee brewFilterCoffee() {
+        // brew a filter coffee
+    }
+
+    public void addCoffeeBeans(CoffeeSelection sel, CoffeeBean newBeans) throws CoffeeException {
+    }
+}
+
+public class CoffeeApp {
+    private CoffeeMachine coffeeMachine;
+    // constructor
+
+    public Coffee prepareCoffee() throws CoffeeException {
+        Coffee coffee = this.coffeeMachine.brewFilterCoffee();
+        return coffee;
+    }  
+}
+
+public class CoffeeAppStarter {
+    public static void main(String[] args) {
+        Map<CoffeeSelection, CoffeeBean> beans = new HashMap<CoffeeSelection, CoffeeBean>();
+        beans.put(CoffeeSelection.ESPRESSO, new CoffeeBean(
+            "My favorite espresso bean", 1000));
+        beans.put(CoffeeSelection.FILTER_COFFEE, new CoffeeBean(
+             "My favorite filter coffee bean", 1000))
+
+        PremiumCoffeeMachine machine = new PremiumCoffeeMachine(beans);
+
+        CoffeeApp app = new CoffeeApp(machine);
+
+        try {
+           app.prepareCoffee();
+        } catch (CoffeeException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+The only code that directly depends on one of the implementation classes is the CoffeeAppStarter class, which instantiates a CoffeeApp object and provides an 
+implementation of the CoffeeMachine interface. You could avoid this compile-time dependency entirely by using a dependency injection framework, like Spring or 
+CDI, to resolve the dependency at runtime.
+
+Embracing Dependency Inversion enables the construction of loosely coupled components—leading to simpler testing and replacement of modules without causing 
+disruptions to the entire system. Furthermore, this approach fosters the utilization of SOLID principles, ultimately leading to a more refined and sustainable 
+codebase.

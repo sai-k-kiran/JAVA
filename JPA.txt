@@ -1,0 +1,305 @@
+To enable JPA in a Spring Boot application, add:
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-jpa</artifactId>
+    <version>3.1.0</version>
+</dependency>
+
+"spring-boot-starter" contains necessary auto-config for Spring JPA. "spring-boot-starter-jpa" project references all the necessary dependencies, 
+such as hibernate-core.
+
+CONFIGURATION:
+
+Spring Boot configures Hibernate as the default JPA provider, so it’s no longer necessary to define the entityManagerFactory bean unless we want to customize it.
+
+Spring boot can auto configures dataSource bean depending on the database we are using. If we are using H2, HSQLDB, Apache derby, the spring boot auto 
+configures the Datasource if corresponding db is present on classpath.
+
+If we want to use MySQL, PostgreSQL, we need connectivity drivers and we need to define Datasource configuration.
+
+@Bean
+public DataSource dataSource() {
+    DriverManagerDataSource dataSource = new DriverManagerDataSource();
+
+    dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+    dataSource.setUsername("mysqluser");
+    dataSource.setPassword("mysqlpass");
+    dataSource.setUrl("jdbc:mysql://localhost:3306/myDb?createDatabaseIfNotExist=true"); 
+    
+    return dataSource;
+}
+
+To configure the data source using a properties file, we have to set properties prefixed with spring.datasource:
+
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.datasource.username=mysqluser
+spring.datasource.password=mysqlpass
+spring.datasource.url= jdbc:mysql://localhost:3306/myDb?createDatabaseIfNotExist=true
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+JPA IN SPRING (NON BOOT):
+
+To use JPA in a Spring project, we need to set up the EntityManager.
+This is the main part of the configuration, and we can do it via a Spring factory bean. This can be either the simpler "LocalEntityManagerFactoryBean" or, 
+the more flexible "LocalContainerEntityManagerFactoryBean".
+
+@Configuration
+@EnableTransactionManagement
+public class PersistenceJPAConfig {
+
+   @Bean
+   public LocalContainerEntityManagerFactoryBean entityManagerFactory() {
+      LocalContainerEntityManagerFactoryBean em = new LocalContainerEntityManagerFactoryBean();
+
+      em.setDataSource(dataSource());
+      em.setPackagesToScan("com.baeldung.persistence.model");
+
+      JpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
+      em.setJpaVendorAdapter(vendorAdapter);
+      em.setJpaProperties(additionalProperties());
+
+      return em;
+   }
+}
+
+We also need to explicitly define the DataSource bean we’ve used above:
+
+@Bean
+public DataSource dataSource(){
+    DriverManagerDataSource dataSource = new DriverManagerDataSource();
+    dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+    dataSource.setUrl("jdbc:mysql://localhost:3306/spring_jpa");
+    dataSource.setUsername( "tutorialuser" );
+    dataSource.setPassword( "tutorialmy5ql" );
+    return dataSource;
+}
+
+The final part of the configuration is the additional Hibernate properties and the TransactionManager and exceptionTranslation beans:
+
+@Bean
+public PlatformTransactionManager transactionManager() {
+    JpaTransactionManager transactionManager = new JpaTransactionManager();
+    transactionManager.setEntityManagerFactory(entityManagerFactory().getObject());
+
+    return transactionManager;
+}
+
+@Bean
+public PersistenceExceptionTranslationPostProcessor exceptionTranslation(){
+    return new PersistenceExceptionTranslationPostProcessor();
+}
+
+Properties additionalProperties() {
+    Properties properties = new Properties();
+    properties.setProperty("hibernate.hbm2ddl.auto", "create-drop");
+    properties.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQL5Dialect");
+       
+    return properties;
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Usually, JPA defines a persistence unit through the META-INF/persistence.xml file. Starting with Spring 3.1, the persistence.xml is no longer necessary. 
+The LocalContainerEntityManagerFactoryBean now supports a packagesToScan property where the packages to scan for @Entity classes can be specified.
+
+This file was the last piece of XML we need to remove. We can now set up JPA fully with no XML.
+
+We would usually specify JPA properties in the persistence.xml file.
+
+Alternatively, we can add the properties directly to the entity manager factory bean:
+
+factoryBean.setJpaProperties(this.additionalProperties());
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Using @Repository annotation activates persistence exception translation for all beans annotated with it to let exceptions being thrown by the JPA persistence 
+providers be converted into Spring’s DataAccessException hierarchy.
+
+Spring Data JPA repositories are default Spring beans. They are singleton scoped and eagerly initialized. During startup, they already interact with the 
+JPA "EntityManager" for verification and metadata analysis purposes. Spring Framework supports the initialization of the JPA "EntityManagerFactory" in a 
+background thread because that process usually takes up a significant amount of startup time in a Spring application.
+
+Spring Data JPA bootstrapping modes:
+
+DEFAULT: Repositories are instantiated eagerly unless explicitly annotated with @Lazy. The lazification only has effect if no client bean needs an instance 
+of the repository.
+
+LAZY: Implicitly declares all repository beans lazy and also causes lazy initialization proxies to be created to be injected into client beans. That means 
+repositories will be instantiated if client bean is making use of the repository during initialization.
+
+DEFERRED — Same as LAZY, but triggering repository initialization in response to an "ContextRefreshedEvent" so that repositories are verified before the 
+application has completely started.
+
+If you’re not using asynchronous JPA bootstrap, stick with the default bootstrap mode.
+
+In case you bootstrap JPA asynchronously, DEFERRED is a reasonable default as it will make sure the Spring Data JPA bootstrap only waits for the 
+"EntityManagerFactory" setup if that itself takes longer than initializing all other application components
+
+LAZY is a decent choice for testing scenarios and local development. In cases when you are testing other parts of the app, running verification for all 
+repositories might unnecessarily increase the startup time.
+
+Entity detection strategies
+
+1. Version-Property and Id-Property inspection (default): Spring Data JPA inspects if there is a version type of non-primitive type. If there is, the entity is 
+considered new if the value of that property is null. If there is no such version-property, JPA checks the identifier of the entity & if it is null, then the
+entity is considered to be new.
+
+2. Implementing Persistable: If an entity implements Persistable, Spring Data JPA delegates the detection to the "isNew(…)" method of the entity.
+
+3. Implementing EntityInformation: You can customize the EntityInformation abstraction used in the "SimpleJpaRepository" implementation by creating a 
+subclass of "JpaRepositoryFactory" and overriding the "getEntityInformation(…)" method
+
+Option 1 is not for entities that use manually assigned id's and no version attribute as with those the identifier will always be non-null.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Query Creation:
+
+public interface UserRepository extends Repository<User, Long> {
+
+  List<User> findByEmailAddressAndLastname(String emailAddress, String lastname);
+}
+
+This translates into the following query: select u from User u where u.emailAddress = ?1 and u.lastname = ?2
+
+@Entity
+@NamedQuery(name = "User.findByEmailAddress", query = "select u from User u where u.emailAddress = ?1")
+public class User {
+
+}
+
+public interface UserRepository extends JpaRepository<User, Long> {
+  User findByEmailAddress(String emailAddress);
+}
+
+As the queries themselves are tied to the Java method that runs them, you can bind them directly by using the Spring Data JPA "@Query" annotation rather 
+than annotating them to the domain class. Queries annotated to the query method take precedence over queries defined using @NamedQuery.
+
+public interface UserRepository extends JpaRepository<User, Long> {
+
+  @Query("select u from User u where u.emailAddress = ?1")
+  User findByEmailAddress(String emailAddress);
+}
+
+Before a query is sent to EntityManager, you can rewrite it at the last moment by query rewriter.
+
+public interface MyRepository extends JpaRepository<User, Long> {
+	@Query(value = "select engineers from employees",
+            nativeQuery = true, queryRewriter = MyQueryRewriter.class)       --> "nativeQuery" = true, to run native SQL queries 
+	List<User> findByNativeQuery(String param);
+
+	@Query(value = "select engineers from User employees", queryRewriter = MyQueryRewriter.class)
+	List<User> findByNonNativeQuery(String param);
+}
+
+public class MyQueryRewriter implements QueryRewriter {
+     @Override
+     public String rewrite(String query, Sort sort) {
+         return query.replaceAll("engineers", "testers");
+     }
+}
+
+QueryRewriter should be registered in the application context, either by applying @Component annotations or a @Bean method inside an @Configuration class.
+
+public interface MyRepository extends JpaRepository<User, Long>, QueryRewriter  {
+    @Query("select u from User u where u.firstname like %?1")    --> Like operator
+    List<User> findByFirstnameEndsWith(String firstname);
+
+	  @Query(value = "select engineers from User employees", queryRewriter = MyQueryRewriter.class)
+	  List<User> findByNonNativeQuery(String param);
+
+    @Override                                   --> implement queryRewriter class inside the repository itself after extending frm it.
+    public String rewrite(String query, Sort sort) {
+        return query.replaceAll("engineers", "testers");
+    }
+}
+
+Spring Data JPA doesnt support sorting for native SQL queries as it would need manipulation of actual declared query which it cannot reliably do for native
+queries. Use native queries for pagination by specifying the count query 
+
+public interface UserRepository extends JpaRepository<User, Long> {
+  @Query(value = "SELECT * FROM USERS WHERE LASTNAME = ?1",
+    countQuery = "SELECT count(*) FROM USERS WHERE LASTNAME = ?1",        --> countQuery
+    nativeQuery = true)
+  Page<User> findByLastname(String lastname, Pageable pageable);
+}
+
+Sorting can be done by either providing a PageRequest or by using Sort directly. The properties actually used within the Order instances of Sort need to 
+match your domain model, which means they need to resolve to either a property or an alias used within the query. The JPQL defines this as a state field 
+path expression. Using any non-referenceable path expression leads to an Exception. 
+
+Using "Sort" together with "@Query" lets you sneak in "Order" instances containing functions within the ORDER BY clause. By default, Spring Data JPA rejects 
+any Order instance containing function calls, but you can use JpaSort.unsafe to add potentially unsafe ordering.
+
+public interface UserRepository extends JpaRepository<User, Long> {
+
+  @Query("select u from User u where u.lastname like ?1%")
+  List<User> findByAndSort(String lastname, Sort sort);
+
+  @Query("select u.id, LENGTH(u.firstname) as fn_len from User u where u.lastname like ?1%")
+  List<Object[]> findByAsArrayAndSort(String lastname, Sort sort);
+}
+
+In the Service class or somwhere else:
+
+repo.findByAndSort("lannister", Sort.by("firstname"));              --> Valid Sort expression pointing to property in domain model.   
+repo.findByAndSort("stark", Sort.by("LENGTH(firstname)"));          --> invalid Sort containing function call. Throws Exception.  
+repo.findByAndSort("targaryen", JpaSort.unsafe("LENGTH(firstname)"));    -->  	Valid Sort containing explicitly unsafe Order.
+repo.findByAsArrayAndSort("bolton", Sort.by("fn_len"));                  -->  	Valid Sort expression pointing to aliased function.
+
+Named params uses position-based binding by default. But the @Param annotation with its "name" property can be used to bind the method params without a 
+correct order of params.
+
+public interface UserRepository extends JpaRepository<User, Long> {
+  @Query("select u from User u where u.firstname = :firstname or u.lastname = :lastname")
+  User findByLastnameOrFirstname(@Param("lastname") String lastname,   --> By default, we would had to pass "firstName" before as it comes first in the SQL query.
+                                 @Param("firstname") String firstname);  ---> By using @Param("name"), we can bind the named params by the name given to method parsm
+}
+
+Spring Data JPA supports a variable called "entityName". Its usage is "select x from #{#entityName}". It inserts the entityName of the domain type 
+associated with the given repository. If the @Entity has set the name attribute, it will use that name ie @Entity("users") otherwise it will use the class name
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* PAGINATION AND SORTING USING JPA:
+
+@Entity 
+public class Product {  
+    @Id
+    private long id;
+    private String name;
+    private double price; 
+    // ...
+}
+
+public interface ProductRepository extends PagingAndSortingRepository<Product, Integer> {
+    List<Product> findAllByPrice(double price, Pageable pageable);
+}
+
+We could have chosen to extend JpaRepository instead, as it extends PagingAndSortingRepository. Once we extend PagingAndSortingRepository, we can add our own methods 
+that take Pageable and Sort as parameters.
+
+In our service class:
+
+    Pageable firstPageWithTwoElements = PageRequest.of(0, 2);   // PageRequest object is an implementation of the Pageable interface
+
+    Pageable secondPageWithFiveElements = PageRequest.of(1, 5);
+
+    Page<Product> allProducts = productRepository.findAll(firstPageWithTwoElements);
+
+    List<Product> allTenDollarProducts = productRepository.findAllByPrice(10, secondPageWithFiveElements);
+
+The findAll(Pageable pageable) method by default returns a Page<T> object.
+However, we can choose to return either a Page<T>, a Slice<T>, or a List<T> from any of our custom methods returning paginated data.
+A Page<T> instance, in addition to having the list of Products, also knows about the total number of available pages. It triggers an additional count query 
+to achieve it. To avoid such an overhead cost, we can instead return a Slice<T> or a List<T>
+
+    Page<Product> allProductsSortedByName = productRepository.findAll(Sort.by("name"));   // sort by name
+
+    Pageable sortedByName = PageRequest.of(0, 3, Sort.by("name"));       // Sorting + pagination
+
+    Pageable sortedByPriceDesc = PageRequest.of(0, 3, Sort.by("price").descending());
+
+    Pageable sortedByPriceDescNameAsc = PageRequest.of(0, 5, Sort.by("price").descending().and(Sort.by("name")));
+
+we can then pass this Pageable type instance to the repository’s method.

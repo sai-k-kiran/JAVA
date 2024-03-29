@@ -1,0 +1,131 @@
+What is an Actuator?
+Actuator brings production-ready features to our application. Monitoring our app, gathering metrics, & understanding traffic or the state of our db.
+The main benefit of this library is that we can get production-grade tools without actually having to implement these features ourselves. The actuator mainly exposes 
+operational information about the running application — health, metrics, info, dump, env etc. It uses HTTP endpoints or JMX beans to enable us to interact with it.
+
+Spring Boot actuator 2.x supports CRUD model as opposed to old read/write model. Actuator 2.x is technology-agnostic, whereas, in 1.x, it was tied to MVC and, 
+therefore, to the Servlet API. Actuator defines its model as pluggable and extensible without relying on MVC for this.
+Hence, with this new model, we can take advantage of MVC and WebFlux as an underlying web technology.
+
+Actuator comes with most endpoints disabled. The only two available by default are /health and /info. If we want to enable all of them, we could set 
+management.endpoints.web.exposure.include=* in application.properties. If we use spring security, we have to include the actuators endpoints
+
+    @Bean
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+        return http.authorizeExchange()
+        .pathMatchers("/actuator/**").permitAll()     // actuator/** means all endpoints after actuator
+        .anyExchange().authenticated()
+        .and().build();
+    }
+
+To expose all endpoints: management.endpoints.web.exposure.include=*
+
+To explicitly enable a specific endpoint (e.g., /shutdown), we use: management.endpoint.shutdown.enabled=true
+
+To expose all enabled endpoints except one (e.g., /loggers), we use:
+
+    management.endpoints.web.exposure.include=*
+    management.endpoints.web.exposure.exclude=loggers
+
+Predefined Endpoints:
+/actuator - returns links to all available actuator endpoints. We can change this base path - management.endpoints.web.base-path = /{path}. when the management base 
+path is set to /, the discovery endpoint is disabled to prevent the possibility of a clash with other mappings.
+
+/actuator/health - summarizes the health status of our application.
+
+/beans - returns all available beans in our BeanFactory(all, not just user created beans). Unlike /auditevents, it doesn’t support filtering.
+
+/metrics - details metrics of our application. This might include generic metrics as well as custom ones.
+
+/conditions - formerly known as /autoconfig, builds a report of conditions around autoconfiguration.
+
+/env - returns the current environment properties. Additionally, we can retrieve single properties.
+
+/info - returns general information. It might be custom data, build information or details about the latest commit.
+
+/flyway - provides details about our Flyway database migrations.
+/liquibase - behaves like /flyway but for Liquibase.
+
+/configprops - allows us to fetch all @ConfigurationProperties beans.
+
+/logfile - returns ordinary application logs.
+/loggers - enables us to query and modify the logging level of our application.
+
+/sessions - lists HTTP sessions, given we are using Spring Session.
+/shutdown - performs a graceful shutdown of the application.
+/threaddump - dumps the thread information of the underlying JVM.
+/heapdump - builds and returns a heap dump from the JVM used by our application.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Creating a Custom Endpoint:
+
+@Component
+@Endpoint(id = "features")      // path of the actuator endpoint -> /actuator/features
+public class FeaturesEndpoint {
+
+    private Map<String, Feature> features = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    public void init(){
+        map.put("health-monitoring", new Feature("health"));
+        map.put("logs-monitoring", new Feature("logs"));
+    }
+
+    @ReadOperation          //  It’ll map to HTTP GET.
+    public Map<String, Feature> features() {
+        return features;
+    }
+
+    @ReadOperation
+    public Feature feature(@Selector String name) {    // @Selector adds the path "name" --> /actuator/features/name will return the feature with key "name"
+        return features.get(name);
+    }
+
+    @WriteOperation           // It’ll map to HTTP POST.
+    public void configureFeature(@Selector String name, Feature feature) {  // /actuator/features/name will add "name" as a key & feature object as the value
+        features.put(name, feature);                                       // feature obj is send through the request body of the POST method
+    }
+
+    @DeleteOperation      // It’ll map to HTTP DELETE.
+    public void deleteFeature(@Selector String name) {
+        features.remove(name);
+    }
+
+    public static class Feature {
+        private Boolean enabled;
+        // getters and setters 
+    }
+}
+
+In Spring actuator 1.x, we simply need to create a class that implements Endpoint interface.
+
+The /info endpoint returns nothing by default. We can add some static/dynamic data to be shown when /info endpoint is accessed. In application.properties file:
+
+info.application.name = Spring Boot actuator project        // static data
+info.application.description = Info endpoint demo
+info.application.artifact = springboot2.x-actuator
+info.application.version = 1
+
+Then actuator/info is hit, the above data will be shown as JSON data
+
+For dynamic data, we have to implement "InfoContributor" interface.
+
+@Component
+public class UserStatusCountContrubutor implements InfoContributor{
+    @Override
+    public void contribute(Info.Builder builder){
+        Map<String, Long> userStatusMap = new HashMap<>();
+        userStatusMap.put("admin", getUserCountByStatus("admin"));
+        userStatusMap.put("user", getUserCountByStatus("user"));
+        userStatusMap.put("guest", getUserCountByStatus("guest"));
+
+        builder.withDetail("userStatus", userStatusMap);
+    }
+
+    public long getUserCountByRole(String role){
+        return getUser().stream().filter(user -> user.getRole().equals(role)).count();
+    }
+}
+
+When we go to actuator/info, it will show the count of user by their role

@@ -1,0 +1,190 @@
+@ExtendWith(SpringExtension::class)
+class UserServiceTest {
+
+    @Mock
+    private UserMapper userMapper;                   // Dependency for the object under test
+
+    @Mock
+    private UserRepository userRepository;            // Dependency for the object under test
+
+    @Mock
+    private UserPrepare userPrepare;                 // Dependency for the object under test
+
+    @Mock
+    private UserEmailService userEmailService;      // Dependency for the object under test
+
+    @InjectMocks
+    private UserServiceImpl userService;            // Object in which mocked dependencies are to be injected
+    // UserService class has depencies of UserMapper, UserRepository, ... userEmailService. So we need to inject this objects into userService.
+
+    @Test
+    void create_user_success_test() {
+        UserCreateDTO userCreateDto = mock(UserCreateDTO.class);
+        User user = mock(User.class);
+        UserReadDTO readDTO = mock(UserReadDTO.class);
+
+        when(userRepository.existsByEmail(userCreateDto.email)).thenReturn(false);
+
+        when(userRepository.existsByPhone(userCreateDto.phone)).thenReturn(false);
+        when(userPrepare.prepareUserForCreation(userCreateDto)).thenReturn(user);
+
+        doNothing().when(userEmailService).sendVerificationEmail(any(), any(), any());
+
+        when(userRepository.save(user)).thenReturn(user);
+        when(userMapper.mapToReadDTO(user)).thenReturn(readDTO);
+
+        val result = userService.create(userCreateDto);
+
+        verify(userRepository, times(1)).existsByEmail(userCreateDto.email);
+        verify(userRepository, times(1)).existsByPhone(userCreateDto.email);
+        verify(userRepository, times(1)).save(user);
+
+        Assertions.assertEquals(user.email, result.email);
+        Assertions.assertEquals(user.phone, result.phone);
+    }
+
+    @Test
+    void create_use_failure_because_of_duplicate_email() {        // Test if the user creation fails with duplicate email exception
+        UserCreateDTO userCreateDto = mock(UserCreateDTO.class);
+        User user = mock(User.class);
+        UserReadDTO readDTO = mock(UserReadDTO.class);
+
+        when(userRepository.existsByEmail(userCreateDTO.email)).thenReturn(true)
+
+        when(userRepository.existsByPhone(userCreateDTO.phone)).thenReturn(false)
+        doNothing().when(userEmailService).sendVerificationEmail(any(), any(), any())
+
+        when(userPrepare.prepareUserForCreation(userCreateDTO)).thenReturn(user)
+
+        when(userRepository.save(user)).thenReturn(user)
+        when(userMapper.mapToReadDTO(user)).thenReturn(readDTO)
+
+
+        val exception = Assertions.assertThrows(RuntimeException.class) {
+            userService.create(userCreateDTO)
+        }
+
+        verify(userRepository, never()).save(any())
+        Assertions.assertTrue(exception.message?.contains("User already exists with this email") ?: false)
+
+    }
+
+    @Test
+    void create_user_failure_because_of_duplicate_phone() {      // Test if the user creation fails with duplicate phone exception
+        UserCreateDTO userCreateDto = mock(UserCreateDTO.class);
+        User user = mock(User.class);
+        UserReadDTO readDTO = mock(UserReadDTO.class);
+
+        when(userRepository.existsByPhone(userCreateDTO.phone)).thenReturn(true)
+        when(userRepository.existsByEmail(userCreateDTO.email)).thenReturn(false)
+
+        doNothing().when(userEmailService).sendVerificationEmail(any(), any(), any())
+
+        when(userPrepare.prepareUserForCreation(userCreateDTO)).thenReturn(user)
+        when(userRepository.save(user)).thenReturn(user)
+        when(userMapper.mapToReadDTO(user)).thenReturn(readDTO)
+
+        val exception = Assertions.assertThrows(RuntimeException::class.java) {
+            userService.create(userCreateDTO)
+        }
+
+        verify(userRepository, never()).save(any())
+        Assertions.assertTrue(exception.message?.contains("User already exists with this phone") ?: false)
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Use of Argument captor to capture arguments provided on methods in test objects
+
+@ExtendWith(SpringExtension::class)
+class UserEmailServiceTest {
+    @Mock
+    private EmailService emailService;
+
+    @InjectMocks
+    private UserEmailServiceImpl userEmailService;
+
+    @Captor
+    private ArgumentCaptor<EmailRequest> emailRequestCaptor;
+
+    @Test
+    void send verification email successfully() {
+        String email = "berat@gmail.com"
+        String firstName = "Berat"
+        String lastName = "Yesbek"
+
+        userEmailService.sendVerificationEmail(email, firstName, lastName)
+
+        verify(emailService, times(1)).send(emailRequestCaptor.capture())    // capture the arguments passed to a method during a test
+
+        val capturedEmailRequest = emailRequestCaptor.value
+        val capturedContext = capturedEmailRequest.context
+
+        assertEquals(email, capturedEmailRequest.email)
+        assertEquals(EmailTemplates.EMAIL_VERIFY, capturedEmailRequest.template)
+        assertEquals(EmailSubjects.COMPLETE_YOUR_REGISTRATION, capturedEmailRequest.subject)
+
+        assertEquals(firstName, capturedContext.getVariable("firstName"))
+        assertEquals(lastName, capturedContext.getVariable("lastName"))
+        assertEquals(EmailMessage.VERIFY_ACCOUNT.message, capturedContext.getVariable("message"))
+    }
+}
+
+The test method checks if the "sendVerificationEmail()" method of UserEmailServiceImpl correctly interacts with the mock EmailService, ensuring that the "send()" 
+method is called with the expected arguments and asserts specific values within the captured EmailRequest. The end of this code compares captured and original values 
+and expects  values have been set correctly.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Integration Test with Test Container PSQL in Spring Boot
+The test container is the isolated environment to implement the integration test. Integration tests are indeed designed to assemble and run different units or 
+components of software together to ensure that they function correctly as a whole.
+Most of the time, integration tests are implemented for Repositories. However, I am going to show it on UserController.
+
+@TestConfiguration 
+class TestContainer {            // This is kotlin code which I modified to java. It may contain some errors(syntax etc).
+    @Bean
+    @ServiceConnection
+    PostgreSQLContainer<Void> postgresSQLContainer():  {
+        val container = PostgreSQLContainer<Void>("postgres:16-alpine");
+        container.withDatabaseName("test")
+        container.withUsername("test")
+        container.withPassword("test")
+        return container
+    }
+}
+
+@ActiveProfiles("test-containers")      // activate specific Spring profiles during a test.
+@ExtendWith(SpringExtension.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)  // spin whole spring app context without starting a web server
+class UserControllerIntegrationTest {
+    @Autowired
+    private UserController userController;
+
+    @Test
+    void create_user_successful() {
+        UserCreateDTO userCreateDTO = UserCreateDTO.builder()
+            .email("berat@gmail.com")
+            .firstname("Berat")
+            .lastname("Yesbek")
+            .phone("1234563443")
+            .password("123456")
+            .build()
+
+        val result = userController.create(userCreateDTO)
+
+        Assertions.assertNotNull(result);
+        Assertions.assertNotNull(result.body);
+        Assertions.assertNotNull(result.body?.id);
+        Assertions.assertEquals(result.statusCode, HttpStatus.OK);
+        Assertions.assertEquals(result.body?.email, userCreateDTO.email);
+        Assertions.assertEquals(result.body?.firstname, userCreateDTO.firstname);
+        Assertions.assertEquals(result.body?.lastname, userCreateDTO.lastname);
+        Assertions.assertEquals(result.body?.phone, userCreateDTO.phone);
+    }
+}
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+- webEnvironment = SpringBootTest.WebEnvironment.NONE Indicates that the test will not involve a web server. The application context will be loaded without starting 
+    a server.
+- It’s commonly used for integration tests where you want to test the application’s components without the overhead of a running web server. 

@@ -1,0 +1,324 @@
+* HOW TO ACHIEVE THREAD-SAFETY IN A MULTITHREADED ENV
+
+In most cases, errors in multithreaded apps are the result of incorrectly sharing state between several threads.
+
+1. Using stateless implementations:
+Our class or method should not maintain a state or a shared resource. 
+
+public class MathUtils {
+    public static BigInteger factorial(int number) {
+        BigInteger f = new BigInteger("1");
+
+        for (int i = 2; i <= number; i++) {
+            f = f.multiply(BigInteger.valueOf(i));
+        }
+        return f;
+    }
+}
+
+factorial() method is a stateless deterministic function. The method neither relies on external state nor maintains state at all. So, it’s considered to be 
+thread-safe and can be safely called by multiple threads at the same time without interfering with each other.
+
+2. Immutable Implementations:
+
+If we need to share state between different threads, we can create thread-safe classes by making them immutable. Even if an object is mutable, if its fields 
+are read-only then also the object is considered thread-safe.
+
+3. Thread-Local Fields:
+We can create thread-safe classes that don’t share state between threads by making their fields thread-local. We can easily create classes whose fields are 
+thread-local by simply defining private fields in Thread classes.
+
+public class ThreadA extends Thread {
+    
+    private final List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5, 6);
+    
+    @Override
+    public void run() {
+        numbers.forEach(System.out::println);
+    }
+}
+
+ThreadA class has its own resource which isnt shared with any other thread. We can create thread-local fields by assigning ThreadLocal instances to a field.
+
+public class StateHolder {
+    private final String state;
+}
+
+public class ThreadState { 
+    public static final ThreadLocal<StateHolder> statePerThread = new ThreadLocal<StateHolder>() {  
+        @Override
+        protected StateHolder initialValue() {
+            return new StateHolder("active");  
+        }
+    };
+
+    public static StateHolder getState() {
+        return statePerThread.get();
+    }
+}
+
+Thread-local fields are pretty much like normal class fields, except that each thread that accesses them via a setter/getter gets an independently 
+initialized copy of the field so that each thread has its own state.
+
+4. Synchronized Collections:
+
+We can easily create thread-safe collections by using the set of synchronization wrappers included within the collections framework.
+
+Collection<Integer> syncCollection = Collections.synchronizedCollection(new ArrayList<>());
+Thread thread1 = new Thread(() -> syncCollection.addAll(Arrays.asList(1, 2, 3, 4, 5, 6)));
+Thread thread2 = new Thread(() -> syncCollection.addAll(Arrays.asList(7, 8, 9, 10, 11, 12)));
+thread1.start();
+thread2.start();
+
+Synchronized collections use intrinsic locking in each method. This means that the methods can be accessed by only one thread at a time, while other threads 
+will be blocked until the method is unlocked by the first thread.
+
+5. Concurrent Collections:
+Java provides the java.util.concurrent package, which contains several concurrent collections, such as ConcurrentHashMap:
+
+Map<String,String> concurrentMap = new ConcurrentHashMap<>();
+concurrentMap.put("1", "one");
+concurrentMap.put("2", "two");
+concurrentMap.put("3", "three");
+
+Concurrent collections achieve thread-safety by dividing their data into segments. In a ConcurrentHashMap several threads can acquire locks on different map 
+segments, so multiple threads can access the Map at the same time.
+
+Concurrent collections are much more performant than synchronized collections, due to the inherent advantages of concurrent thread access. Synchronized and 
+concurrent collections only make the collection itself thread-safe and not the contents.
+
+6. Atomic Objects:
+
+Atomic classes allow us to perform atomic operations, which are thread-safe, without using synchronization. An atomic operation is executed in one single 
+machine-level operation.
+
+public class AtomicCounter {
+    private final AtomicInteger counter = new AtomicInteger();
+    
+    public void incrementCounter() {
+        counter.incrementAndGet();
+    }
+    
+    public int getCounter() {
+        return counter.get();
+    }
+}
+
+This is thread-safe because while incrementation, ++ takes more than one operation, incrementAndGet is atomic.
+
+7. Synchronized Methods:
+Only one thread can access a synchronized method at a time, while blocking access to this method from other threads. Other threads will remain blocked until 
+the first thread finishes or the method throws an exception.
+
+public synchronized void incrementCounter() {
+    counter += 1;
+}
+
+Synchronized methods rely on the use of “intrinsic locks” or “monitor locks.” An intrinsic lock is an implicit internal entity associated with a particular 
+class instance. In a multithreaded context, the term monitor is just a reference to the role that the lock performs on the associated object, as it enforces 
+exclusive access to a set of specified methods or statements.
+
+When a thread calls a synchronized method, it acquires an intrinsic lock. After the thread finishes executing, it releases the lock and other thread can
+acquire the lock and can access the resource/method.
+We can implement synchronization in instance methods, static methods and statements (synchronized statements).
+
+8. Synchronized Statements/blocks:
+Sometimes synchronizing an entire method might be overkill if we just need to make a segment of the method thread-safe. Let’s refactor the incrementCounter() method:
+
+public void incrementCounter() {
+    synchronized(this) {
+        counter += 1; 
+    }
+}
+
+Synchronization is expensive, so with this option, we are able to only synchronize the relevant parts of a method.
+We can slightly improve the thread-safe implementation of the Counter class by exploiting another object as a monitor lock instead of this.
+
+public class ObjectLockCounter {
+    private int counter = 0;
+    private final Object lock = new Object();
+    
+    public void incrementCounter() {
+        synchronized(lock) {
+            counter += 1;
+        }
+    }
+}
+
+We used a plain Object instance to enforce mutual exclusion. This implementation is slightly better, as it promotes security at the lock level.
+When using "this" for intrinsic locking, an attacker could cause a deadlock by acquiring the intrinsic lock and triggering a denial of service(DoS) condition.
+
+We should not use Strings for locking purpose. 
+
+public class Class1 {
+    private static final String LOCK  = "Lock";
+}
+
+public class Class2 {
+    private static final String LOCK  = "Lock";
+}
+
+Because of string interning, these 2 "Lock" values may point to the same object in thr string pool. Then Class1 & Class2 will have same lock. This may cause
+unexpected behaviors in concurrent contexts.
+In addition to Strings, we should avoid using any cacheable or reusable objects as intrinsic locks. Ex, Integer.valueOf() caches for small integers. Therefore
+calling Integer.valueOf() may sometime return the cached object.
+
+9. Volatile fields:
+synchronized keyword can not be used for variables/fields. The values of regular class fields might be cached by the CPU. Hence, consequent updates to a particular 
+field, even if they’re synchronized, might not be visible to other threads. To prevent this situation, we can use volatile class fields:
+
+public class Counter {
+    private volatile int counter;    
+}
+
+With volatile keyword, we instruct JVM to read & write the variable value directly from main memory instead of cache. If 1 variable of a class is volatile
+then all variables will be volatile even if the volatile keyword is not present.
+
+A write to a non-volatile or volatile variable that happens before a write to a volatile variable is guaranteed to happen before the write to that volatile variable. 
+That means the volatile variable will be written at last, after writing to any other variable.
+
+A read of a volatile variable will happen before any subsequent reads of volatile and non-volatile variables. That means, the volatile variable will be read first
+than any other variables visible to that thread at that time.
+
+10. Reentrant Locks:
+With Reentrant lock, it gives priority access to the threads which are waiting for a longer time in queue. 
+
+public class ReentrantLockCounter {
+    private int counter;
+    private final ReentrantLock reLock = new ReentrantLock(true);
+    
+    public void incrementCounter() {
+        reLock.lock();
+        try {
+            counter += 1;
+        } finally {
+            reLock.unlock();
+        }
+    }
+}
+
+The ReentrantLock constructor takes an optional fairness boolean parameter. When set to true, and multiple threads are trying to acquire a lock, the 
+JVM will give priority to the longest waiting thread and grant access to the lock.
+
+11. Read/Write Locks
+A ReadWriteLock lock actually uses a pair of associated locks, one for read-only operations and the other for writing operations. 
+As a result, it’s possible to have many threads reading a resource, as long as there’s no thread writing to it. Moreover, the thread writing to the 
+resource will prevent other threads from reading it.
+
+public class ReentrantReadWriteLockCounter {   
+    private int counter;
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Lock readLock = rwLock.readLock();
+    private final Lock writeLock = rwLock.writeLock();
+    
+    public void incrementCounter() {
+        writeLock.lock();
+        try {
+            counter += 1;
+        } finally {
+            writeLock.unlock();
+        }
+    }
+    
+    public int getCounter() {
+        readLock.lock();
+        try {
+            return counter;
+        } finally {
+            readLock.unlock();
+        }
+    }  
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* THREADLOCALRANDOM:
+java.util.Random class is used to generate a random value. But it doesnt perform well in a multithreaded env coz thread contention multiple threads share 
+the same Random instance. java.util.concurrent.ThreadLocalRandom class is used to generate random values in a multithreaded env.
+
+ThreadLocalRandom is a combination of the ThreadLocal and Random classes and is isolated to the current thread. Thus, it achieves better performance 
+in a multithreaded environment by simply avoiding any concurrent access to instances of Random.
+The random number obtained by one thread is not affected by the other thread, whereas java.util.Random provides random numbers globally.
+
+Unlike Random, ThreadLocalRandom doesn’t support setting the seed explicitly. Instead, it overrides the setSeed(long seed) method inherited from Random to 
+always throw an UnsupportedOperationException if called.
+
+In Random class, there is a "seed" property which is changed everytime a random value is generated. When multiple threads try to change the seed(high contention), 
+only one thread succeeds in changing the seed and all others loses. When there are many threads trying to update the seed value, the process of "losing all 
+threads - winning 1 thread" hurt the overall performance significantly.
+
+ThreadLocalRandom completely removes this contention, as each thread has its own instance of Random and, consequently, its own confined seed.
+
+ThreadLocalRandom.current() method will return the instance of ThreadLocalRandom for the current thread:
+    int unboundedRandomValue = ThreadLocalRandom.current().nextInt();
+    int boundedRandomValue = ThreadLocalRandom.current().nextInt(0, 100);  --> generate random value between 0 to 100(exclusive)
+
+nextLong() and nextDouble() -> to generate random long and double values. 
+nextGaussian() -> to generate next normally-distributed value with a 0.0 mean and 1.0 standard deviation from the generator’s sequence.
+doubles(), ints() and longs() -> to generate streams of random values.
+
+Implementation details:
+As of Java 8, ThreadLocalRandom became a singleton. 
+
+static final ThreadLocalRandom instance = new ThreadLocalRandom();
+
+public static ThreadLocalRandom current() {
+    if (U.getInt(Thread.currentThread(), PROBE) == 0)
+        localInit();
+
+    return instance;
+}
+
+Sharing one global Random instance leads to sub-optimal performance in high contention. However, using one dedicated instance per thread is also overkill.
+Instead of a dedicated instance of Random per thread, each thread only needs to maintain its own seed value. 
+
+public class Thread implements Runnable {
+    @jdk.internal.vm.annotation.Contended("tlr")
+    long threadLocalRandomSeed;     --> responsible for maintaining the current seed value for ThreadLocalRandom
+
+    @jdk.internal.vm.annotation.Contended("tlr")
+    int threadLocalRandomProbe; 
+
+    @jdk.internal.vm.annotation.Contended("tlr")
+    int threadLocalRandomSecondarySeed;     -->  used internally by the likes of ForkJoinPool.
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* What Is Java Memory Model (Jmm)? Describe Its Purpose and Basic Ideas.
+It specifies how multiple threads access common memory in a concurrent Java app and how data changes by one thread are made visible to other threads. 
+
+The need for memory model arises from the fact that the way your Java code is accessing data is not how it actually happens on the lower levels. Memory 
+writes and reads may be reordered or optimized by the Java compiler, JIT compiler, and even CPU, as long as the observable result of these reads and writes 
+is the same.
+
+This can lead to counter-intuitive results when your application is scaled to multiple threads because most of these optimizations take into account a single 
+thread of execution (the cross-thread optimizers are still extremely hard to implement). Another huge problem is that the memory in modern systems is multilayered: 
+multiple cores of a processor may keep some non-flushed data in their caches or read/write buffers, which also affects the state of the memory observed from other cores.
+
+To make things worse, the existence of different memory access architectures would break the Java’s promise of “write once, run everywhere”. Happily for 
+the programmers, the JMM specifies some guarantees that you may rely upon when designing multithreaded applications. Sticking to these guarantees helps 
+a programmer to write multithreaded code that is stable and portable between various architectures.
+
+The main notions of JMM are:
+
+- Actions, these are inter-thread actions that can be executed by one thread and detected by another thread, like reading/ writing variables, locking/unlocking 
+    monitors and so on
+
+- Synchronization actions, a certain subset of actions, like reading/writing a volatile variable, or locking/unlocking a monitor
+- Program Order (PO), the observable total order of actions inside a single thread
+
+- Synchronization Order (SO), the total order between all synchronization actions, it has to be consistent with Program Order, that is, if two synchronization 
+    actions come one before another in PO, they occur in the same order in SO
+
+- synchronizes-with (SW) relation between certain synchronization actions, like unlocking of monitor and locking of the same monitor (in another or the same thread)
+
+- Happens-before Order — combines PO with SW (this is called transitive closure in set theory) to create a partial ordering of all actions between threads. 
+    If one action happens-before another, then the results of the first action are observable by the second action (for instance, write of a variable in one thread 
+    and read in another)
+- Happens-before consistency — a set of actions is HB-consistent if every read observes either the last write to that location in the happens-before order, 
+    or some other write via data race
+
+- Execution — a certain set of ordered actions and consistency rules between them
+
+For a given program, we can observe multiple different executions with various outcomes. But if a program is correctly synchronized, then all of its executions 
+appear to be sequentially consistent, meaning you can reason about the multithreaded program as a set of actions occurring in some sequential order. This 
+saves you the trouble of thinking about under-the-hood reorderings, optimizations or data caching.

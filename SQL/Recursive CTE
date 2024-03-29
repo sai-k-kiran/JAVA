@@ -1,0 +1,126 @@
+Recursive CTE(Common Table Expression):
+
+Recursive CTEs allow you to build the result set progressively in multiple iterations. These are widely used when processing hierarchical table structures.
+
+WITH RECURSIVE cte_name AS(
+    SELECT 1 AS n     // Base condition
+
+    UNION ALL 
+
+    SELECT n + 1 FROM cte_name WHERE n < 3    // recursive function
+)
+
+SELECT * FROM cte_name;
+
+The Base condition will be the 1st row in our table. Then our recursive function will run taking n = 1.
+the recursive function will retrive values of n + 1 until n < 3. That means our table will have:
+    1   // bcoz of base condition
+    2   // n = 1 so n < 3, then retrive n+1 (1+1). Then make n = (1+1) = 2
+    3   // n = 2 so n < 3, then retrive n+1 (2+1). Then make n = (2+1) = 3
+
+Employees Table:
+id   |      name     |   manager_id
+----------------------------
+1    |   John        |    null
+2    |   Mark        |    1
+3    |   Tom         |    2
+4    |   Charles     |    3
+5    |   Jane        |    4
+
+WITH RECURSIVE EmpCTE AS(
+    SELECT emp_id, name, manager_id FROM employees
+    WHERE employees.emp_id = 5;     // First row  =   5  | Jane |  4
+
+    UNION ALL 
+
+    SELECT emp_id, name, manager_id FROM employees JOIN EmpCTE
+    ON employees.emp_id = EmpCTE.manager_id;     // retrive a record where the emp_id = EmpCTE.manager_id(4 initially)
+)
+
+OUTPUT:
+id   |      name     |   manager_id
+----------------------------
+5    |   Jane        |    4
+4    |   Charles     |    3
+3    |   Tom         |    2
+2    |   Mark        |    1
+1    |   John        |    null
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+for(int i = 0, sum = 0; i <= 5; i++){
+    Map<String, Integer> map = new HashMap<>();
+
+    map.put("i", i);
+    map.put("consecutive_sum", sum += i);
+
+    list.add(map);
+} 
+
+WITH RECURSIVE consecutive_number_sum(i, consecutive_sum) AS{
+    SELECT 0, 0;      // base condition     i = 0, consecutive_sum = 0
+
+    UNION ALL;
+
+    SELECT i+1, i+1 + consecutive_sum FROM consecutive_number_sum 
+    WHERE i < 5;
+}
+
+| i | consecutive_sum |
+|---|-----------------|
+| 0 | 0               |    // base condition
+| 1 | 1               |
+| 2 | 3               |
+| 3 | 6               |
+| 4 | 10              |
+| 5 | 15              |
+
+Another ex: Consider 2 tables: Post & Comment. Comment can have nested comments so a record in Comment table can have reference to another record in the same Comment
+table as the parent_comment;
+
+Comment table:
+| id | parent_id | review        | created_on          | score | post_id
+|----|-----------|---------------|---------------------|-------|---------
+| 1  |           | Comment 1     | 2019-10-13 12:23:05 |  1    |   1
+| 2  | 1         | Comment 1.1   | 2019-10-14 13:23:10 |  2    |   1
+| 3  | 1         | Comment 1.2   | 2019-10-14 15:45:15 |  2    |   1
+| 4  | 3         | Comment 1.2.1 | 2019-10-15 10:15:20 |  1    |   1
+| 5  |           | Comment 2     | 2019-10-13 15:23:25 |  1    |   1
+| 6  | 5         | Comment 2.1   | 2019-10-14 11:23:30 |  1    |   1
+| 7  | 5         | Comment 2.2   | 2019-10-14 14:45:35 |  1    |
+| 8  |           | Comment 3     | 2019-10-15 10:15:40 |  1    |
+| 9  | 8         | Comment 3.1   | 2019-10-16 11:15:45 | 10    |
+| 10 | 8         | Comment 3.2   | 2019-10-17 18:30:50 | -2    |
+| 11 |           | Comment 4     | 2019-10-19 21:43:55 | -5    |
+| 12 |           | Comment 5     | 2019-10-22 23:45:00 |  0    |
+The rows which have null values in "parent_id" column, are the parent comment e.g comments with id = 1, 5, 8, 11, 12 are parent. Other are nested comments.
+e.g comment id = 2, 3 is nested in comment id = 1. comment id = 4 is nested in comment id = 3 so 1 > (2, 3 > 4)
+We want to sum the total score of a comment. Total score = score of self + score of all nested comments. So score of id = 1 is (1 + 2 + 2 + 1) = 6.
+
+WITH RECURSIVE comment_score(id, root, post_id, parent_id, score) AS(    // This recursive CTE is to give same ids to all comments which belongs to same comment
+    SELECT id, parent_id, post_id, score FROM comment 
+    WHERE post_id = 1 AND parent_id = null;
+
+    UNION ALL
+
+    SELECT id, root, parent_id, post_id, score FROM comment c INNER JOIN  // "root" column is used to give all the nested comments same id
+    comment_score cs ON c.parent_id = cs.id
+)
+
+SELECT id, parent_id, score, root, SUM(score) OVER (PARTITION BY root) AS total_score
+FROM comment_score ORDER BY id;
+
+OUTPUT:
+| id | parent_id |  score |   root   |    total_score |
+|----|-----------|--------|----------|----------------|
+| 1  |           |  1     |    1     |    6           | // score = 1(self) + 2(id = 2) + 2(id = 3) + 1(id = 4)
+| 2  | 1         |  2     |    1     |    6           |
+| 3  | 1         |  2     |    1     |    6           |
+| 4  | 3         |  1     |    1     |    6           |
+| 5  |           |  1     |    5     |    3           |
+| 6  | 5         |  1     |    5     |    3           |
+| 7  | 5         |  1     |    5     |    3           |
+| 8  |           |  1     |    8     |    9           |
+| 9  | 8         |  10    |    8     |    9           |
+| 10 | 8         |  -2    |    8     |    9           |
+| 11 |           |  -5    |    11    |   -5           |
+| 12 |           |  0     |    12    |    0           |

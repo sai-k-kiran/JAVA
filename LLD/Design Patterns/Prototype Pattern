@@ -1,0 +1,261 @@
+Prototype is a creational design pattern that lets you copy existing objects without making your code dependent on their classes.
+
+To copy an object, we can create a new object from its class and copy fields from the old object into new object. Not all fields can be copied because some fields 
+can be private. And also, copying this way is making out copied object dependent on the class. Sometimes, the concrete object is not known as the object to copied 
+is implementing an interface but not sure what class is implementing it.
+
+The Prototype pattern delegates the cloning process to the actual objects that are being cloned. The pattern declares a common interface for all objects that support 
+cloning. This interface lets you clone an object without coupling your code to the class of that object. Usually, such an interface contains just a single clone method.
+
+The implementation of the clone method is very similar in all classes. The method creates an object of the current class and carries over all of the field values 
+of the old object into the new one. You can even copy private fields because most programming languages let objects access private fields of other objects that 
+belong to the same class.
+
+An object that supports cloning is called a prototype. When your objects have dozens of fields and hundreds of possible configurations, cloning them might serve 
+as an alternative to subclassing.
+
+Here’s how it works: you create a set of objects, configured in various ways. When you need an object like the one you’ve configured, you just clone a prototype 
+instead of constructing a new object from scratch.
+
+1. The Prototype interface declares the cloning methods. In most cases, it’s a single clone method.
+
+2. The Concrete Prototype class implements the cloning method. In addition to copying the original object’s data to the clone, this method may also handle some 
+edge cases of the cloning process related to cloning linked objects, untangling recursive dependencies, etc.
+
+3. The Client can produce a copy of any object that follows the prototype interface.
+
+The Prototype Registry provides an easy way to access frequently-used prototypes. It stores a set of pre-built objects that are ready to be copied. 
+The simplest prototype registry is a "name → prototype" hash map. However, if you need better search criteria than a simple name, you can build a much 
+more robust version of the registry.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+public abstract class Shape {         // Common shape interface
+    // fields
+
+    public Shape() {
+    }
+
+    public Shape(Shape target) {
+    }
+
+    public abstract Shape clone();
+
+    @Override
+    public boolean equals(Object object2) {
+    }
+}
+
+public class Circle extends Shape {         // Simple shape extending "Shape" class
+    public Circle() {
+    }
+
+    public Circle(Circle target) {         //  prototypical version of the constructor
+
+    }
+
+    @Override
+    public Shape clone() {
+        return new Circle(this);
+    }
+
+    @Override
+    public boolean equals(Object object2) {
+    }
+}
+
+public class Rectangle extends Shape {         // Simple shape extending "Shape" class
+    public Rectangle() {
+    }
+
+    public Rectangle(Rectangle target) {
+
+    }
+
+    @Override
+    public Shape clone() {
+        return new Rectangle(this);
+    }
+
+    @Override
+    public boolean equals(Object object2) {
+    }
+}
+
+public class Demo {                           // Main class
+    public static void main(String[] args) {
+        List<Shape> shapes = new ArrayList<>();
+        List<Shape> shapesCopy = new ArrayList<>();
+
+        Circle circle = new Circle();
+        circle.x = 10;
+        circle.y = 20;
+        circle.radius = 15;
+        circle.color = "red";
+        shapes.add(circle);
+
+        Circle anotherCircle = (Circle) circle.clone();
+        shapes.add(anotherCircle);
+
+        Rectangle rectangle = new Rectangle();
+        rectangle.width = 10;
+        rectangle.height = 20;
+        rectangle.color = "blue";
+        shapes.add(rectangle);
+
+        cloneAndCompare(shapes, shapesCopy);
+    }
+
+    private static void cloneAndCompare(List<Shape> shapes, List<Shape> shapesCopy) {
+        for (Shape shape : shapes) {
+            shapesCopy.add(shape.clone());
+        }
+
+        for (int i = 0; i < shapes.size(); i++) {
+            if (shapes.get(i) != shapesCopy.get(i)) {
+                System.out.println(i + ": Shapes are different objects (yay!)");
+                if (shapes.get(i).equals(shapesCopy.get(i))) {
+                    System.out.println(i + ": And they are identical (yay!)");
+                } else {
+                    System.out.println(i + ": But they are not identical (booo!)");
+                }
+            } else {
+                System.out.println(i + ": Shape objects are the same (booo!)");
+            }
+        }
+    }
+}
+
+OP:
+0: Shapes are different objects (yay!)
+0: And they are identical (yay!)
+1: Shapes are different objects (yay!)
+1: And they are identical (yay!)
+2: Shapes are different objects (yay!)
+2: And they are identical (yay!)
+
+Using Prototype Registry:
+
+public class BundledShapeCache {
+    private Map<String, Shape> cache = new HashMap<>();
+
+    public BundledShapeCache() {
+        Circle circle = new Circle();
+        circle.x = 5;
+        circle.y = 7;
+        circle.radius = 45;
+        circle.color = "Green";
+
+        Rectangle rectangle = new Rectangle();
+        rectangle.x = 6;
+        rectangle.y = 9;
+        rectangle.width = 8;
+        rectangle.height = 10;
+        rectangle.color = "Blue";
+
+        cache.put("Big green circle", circle);
+        cache.put("Medium blue rectangle", rectangle);
+    }
+
+    public Shape put(String key, Shape shape) {
+        cache.put(key, shape);
+        return shape;
+    }
+
+    public Shape get(String key) {
+        return cache.get(key).clone();
+    }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        BundledShapeCache cache = new BundledShapeCache();
+
+        Shape shape1 = cache.get("Big green circle");
+        Shape shape2 = cache.get("Medium blue rectangle");
+        Shape shape3 = cache.get("Medium blue rectangle");
+
+        if (shape1 != shape2 && !shape1.equals(shape2)) {
+            System.out.println("Big green circle != Medium blue rectangle (yay!)");
+        } else {
+            System.out.println("Big green circle == Medium blue rectangle (booo!)");
+        }
+
+        if (shape2 != shape3) {
+            System.out.println("Medium blue rectangles are two different objects (yay!)");
+            if (shape2.equals(shape3)) {
+                System.out.println("And they are identical (yay!)");
+            } else {
+                System.out.println("But they are not identical (booo!)");
+            }
+        } else {
+            System.out.println("Rectangle objects are the same (booo!)");
+        }
+    }
+}
+
+OP:
+Big green circle != Medium blue rectangle (yay!)
+Medium blue rectangles are two different objects (yay!)
+And they are identical (yay!)
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+APPLICABILITY:
+
+- Use the Prototype pattern when your code shouldn’t depend on the concrete classes of objects that you need to copy.
+
+This happens a lot when your code works with objects passed to you from 3rd-party code via some interface. The concrete classes of these objects are unknown, 
+and you couldn’t depend on them even if you wanted to.
+
+The Prototype pattern provides the client code with a general interface for working with all objects that support cloning. This interface makes the client code 
+independent from the concrete classes of objects that it clones.
+
+- Use the pattern when you want to reduce the number of subclasses that only differ in the way they initialize their respective objects.
+
+Suppose you have a complex class that requires a laborious configuration before it can be used. There are several common ways to configure this class, and this 
+code is scattered through your app. To reduce the duplication, you create several subclasses and put every common configuration code into their constructors. 
+You solved the duplication problem, but now you have lots of dummy subclasses.
+
+The Prototype pattern lets you use a set of pre-built objects configured in various ways as prototypes. Instead of instantiating a subclass that matches some 
+configuration, the client can simply look for an appropriate prototype and clone it.
+
+HOW TO IMPLEMENT IT:
+
+1. Create the prototype interface and declare the clone method in it. Or just add the method to all classes of an existing class hierarchy, if you have one.
+
+2. A prototype class must define the alternative constructor that accepts an object of that class as an argument. The constructor must copy the values of all 
+fields defined in the class from the passed object into the newly created instance. If you’re changing a subclass, you must call the parent constructor to let the 
+superclass handle the cloning of its private fields.
+
+3. The cloning method usually consists of just one line: running a "new" operator with the prototypical version of the constructor. Note, that every class must 
+explicitly override the cloning method and use its own class name along with the new operator. Otherwise, the cloning method may produce an object of a parent class.
+
+4. Optionally, create a centralized prototype registry to store a catalog of frequently used prototypes.
+
+You can implement the registry as a new factory class or put it in the base prototype class with a static method for fetching the prototype. This method 
+should search for a prototype based on search criteria that the client code passes to the method. The criteria might either be a simple string tag or a 
+complex set of search parameters. After the appropriate prototype is found, the registry should clone it and return the copy to the client.
+
+Finally, replace the direct calls to the subclasses’ constructors with calls to the factory method of the prototype registry.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+RELATIONS WITH OTHER PATTERNS:
+
+- Many designs start by using Factory Method (less complicated and more customizable via subclasses) and evolve toward Abstract Factory, Prototype, or Builder 
+(more flexible, but more complicated).
+
+- Abstract Factory classes are often based on a set of Factory Methods, but you can also use Prototype to compose the methods on these classes.
+
+- Prototype can help when you need to save copies of Commands into history.
+
+- Designs that make heavy use of Composite and Decorator can often benefit from using Prototype. Applying the pattern lets you clone complex structures instead of 
+re-constructing them from scratch.
+
+- Prototype isn’t based on inheritance, so it doesn’t have its drawbacks. On the other hand, Prototype requires a complicated initialization of the cloned object. 
+Factory Method is based on inheritance but doesn’t require an initialization step.
+
+- Sometimes Prototype can be a simpler alternative to Memento. This works if the object, the state of which you want to store in the history, is fairly 
+straightforward and doesn’t have links to external resources, or the links are easy to re-establish.
+
+- Abstract Factories, Builders and Prototypes can all be implemented as Singletons. 

@@ -1,0 +1,101 @@
+@Autowired: Bean Autowiring
+1. Autowiring by Constructor: Autowiring by constructor is a clean and concise way to inject dependencies. In this approach, we utilize the constructor arguments to 
+inject the dependencies into the bean.
+
+	public class ShapeService {
+
+		private final Shape shape;
+
+		public ShapeService(Shape shape) {   // In older versions of spring, @Autowired annotation was required on top of constructor.
+			this.shape = shape;
+		}
+	}
+
+2. @Autowired Annotation: The @Autowired annotation in Spring Framework is used for automatic dependency injection. It can be applied to fields, setter methods, and 
+constructors to indicate that Spring should automatically provide the required dependencies.
+
+	public class ShapeService {
+
+		private Shape shape;
+
+		@Autowired
+		public void setShape(Shape shape) {       // Constructor injection
+			this.shape = shape;
+		}
+
+		@Autowired
+		private Shape shape;         // field injection
+
+		@Autowired
+		shapeService.setShape(shape);    // setter injection
+	}
+
+Using @Qualifier for Conflict Resolution:
+If there is exactly one bean of the property type in the container, it injects that bean.
+If there are multiple candidates of the same type, Spring throws "NoUniqueBeanDefinitionException" because it cannot determine which one to inject.
+
+The @Qualifier annotation helps in solving the NoUniqueBeanDefinitionException when there are two matching beans of the same type.
+	public class BeanConfig {
+
+		@Bean
+		Square square() {
+			return new Square();
+		}
+
+		@Bean
+		Circle circle() {
+			return new Circle();
+		}
+	}
+
+	public class ShapeService {
+
+		@Autowired(required = false)     // optional dependency
+		@Qualifier("circle")
+		private Shape shape;
+	}
+
+Circular Dependencies and Autowiring:
+In a Spring app, if there is a circular dependency between 2 or more beans, Spring will create proxies or use lazy initialization to resolve the circular reference
+
+	public class A {
+		
+		@Autowired
+		private B b;
+	}
+
+	public class B {
+		
+		@Autowired
+		private A a;
+	}
+
+Internally Spring will use either proxy objects or lazy initialization technique or a combination of both.
+
+- In the proxy object approach, a proxy object is created for one of the circular dependencies. The actual instance is then injected once it’s fully constructed.
+- In the lazy initialization approach, Spring creates partially initialized instances of beans involved in the circular reference and then completes their 
+	initialization later. This allows Spring to break the circular reference temporarily during the bean creation phase.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Autowiring Dependencies:
+
+Wiring allows the Spring container to automatically resolve dependencies between collaborating beans by inspecting the beans that have been defined.
+There are four modes of autowiring a bean:
+
+- no: the default value – this means no autowiring is used for the bean and we have to explicitly name the dependencies.
+
+- byName: autowiring is done based on the name of the property, therefore Spring will look for a bean with the same name as the property that needs to be set.
+
+- byType: similar to the byName autowiring, only based on the type of the property. This means Spring will look for a bean with the same type of the property to set. 
+	If there’s more than one bean of that type, the framework throws an exception.
+
+- constructor: autowiring is done based on constructor arguments, meaning Spring will look for beans with the same type as the constructor arguments.
+
+@Bean(autowire = Autowire.BY_TYPE)
+public class Store {
+    private Item item;
+    public setItem(Item item) {
+        this.item = item;
+    }
+}

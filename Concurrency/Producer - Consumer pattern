@@ -1,0 +1,271 @@
+Code for producer-consumer pattern using a Queue:
+
+public class Main{   
+   public static void main(String[] args) {
+        ProducerConsumer producerConsumer = new ProducerConsumer(5);
+        Thread producer1 = new Thread(new Task(true, producerConsumer), "Producer1 ");
+        Thread producer2 = new Thread(new Task(true, producerConsumer), "Producer2 ");
+        Thread consumer1 = new Thread(new Task(false, producerConsumer), "Consumer1 ");
+        Thread consumer2 = new Thread(new Task(false, producerConsumer), "Consumer2 ");
+        
+        consumer1.start();
+        producer1.start();
+        producer2.start();
+        consumer2.start();
+    }
+}
+
+class Task implements Runnable {
+    boolean isProducer;
+    ProducerConsumer producerConsumer;
+
+    public Task(boolean isProducer, ProducerConsumer producerConsumer) {
+        this.isProducer = isProducer;
+        this.producerConsumer = producerConsumer;
+    }
+    
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                if (isProducer) {
+                    producerConsumer.produce();
+                } else {
+                    producerConsumer.consume();
+                }
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class ProducerConsumer {
+    Queue<Integer> list;
+    int capacity;
+    int value = 1;
+
+    public ProducerConsumer(int capacity) {
+        this.capacity = capacity;
+        list = new LinkedList<>();
+    }
+
+    public synchronized void produce() throws InterruptedException {
+        while (list.size() == capacity) {
+            System.out.println(Thread.currentThread().getName() + " : waiting");
+            wait();
+        }
+        System.out.println(Thread.currentThread().getName() + "Produced : " + value);
+        list.add(value++);
+        notify();
+        Thread.sleep(1000);
+    }
+
+    public synchronized void consume() throws InterruptedException {
+        while (list.size() == 0) {
+            System.out.println(Thread.currentThread().getName() + " : waiting");
+            wait();
+        }
+        System.out.println(Thread.currentThread().getName() + "Consumed : " + list.poll());
+        value--;
+        notify();
+        Thread.sleep(1000);
+    }
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Code for producer-consumer pattern using BlockingQueue;
+
+public class Main{   
+   public static void main(String[] args) {        
+        BlockingQueue<String> q = new ArrayBlockingQueue<>(3);
+        
+        Producer p1 = new Producer(q);
+        
+        Thread producerThread = new Thread(p1);
+      
+        producerThread.start();
+        
+        ExecutorService executorService = Executors.newFixedThreadPool(5);
+        
+        for(int i = 0; i < 5; i++){
+            executorService.execute(() -> {
+                new Thread(new Consumer(q)).start();
+            });
+        }
+        
+        executorService.shutdown();
+    }
+}
+
+class Producer implements Runnable{
+    private BlockingQueue<String> q;
+    int cap = 3;
+    
+    public Producer(BlockingQueue<String> q){
+        this.q = q;
+    }
+    
+    public void run(){
+        while(true){
+            long currTime = System.currentTimeMillis();
+            try{
+                System.out.println(Thread.currentThread().getName() +" produced " + currTime);
+                q.put(currTime + "");
+            }
+            catch(Exception e){
+                System.out.println("Producer was interrupted");
+            }
+            sleep(1000);      // directly calling Thread.sleep() wont work coz "Thread.sleep()" should be inside a try block & the catch block should catch
+        }                     // InterruptedException.
+    }
+      
+    public void sleep(int time){        // Thats why I made a separate method to wrap the "Thread.sleep()" method in try-catch block
+        try{
+            Thread.sleep(1000);
+        } catch(InterruptedException e){
+            e.printStackTrace();
+        }
+    }
+}
+
+class Consumer implements Runnable{
+    private BlockingQueue<String> q;
+    
+    public Consumer(BlockingQueue<String> q){
+        this.q = q;
+    }
+    
+    public void run(){
+        while(true){
+            try{
+                System.out.println(Thread.currentThread().getName() +" consumed " + q.take());
+            }
+            catch(Exception e){
+                System.out.println("Producer was interrupted");
+            }
+            sleep(1000);
+        }
+    }
+    
+    public void sleep(int time){
+        try{
+            Thread.sleep(1000);
+        } catch(InterruptedException e){
+            e.printStackTrace();
+        }
+    }
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* SENDER - RECEIVER SYNCHRONIZATION PROBLEM:
+The sender sends a data packet to receiver. Sender shouldnt attempt to send another packet unless receiver has already processed the previous packet.
+The Receiver cannot process the data packet until the Sender finishes sending the data packet.
+
+public class Data {
+    private String packet;
+    
+    private boolean transfer = true;  // true if receiver should wait, false if sender should wait.
+ 
+    public synchronized String receive() {
+        while (transfer) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); 
+                System.err.println("Thread Interrupted");
+            }
+        }
+        transfer = true;
+        
+        String returnPacket = packet;
+        notifyAll();
+        return returnPacket;
+    }
+ 
+    public synchronized void send(String packet) {
+        while (!transfer) {
+            try { 
+                wait();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); 
+                System.err.println("Thread Interrupted");
+            }
+        }
+        transfer = false;
+        
+        this.packet = packet;
+        notifyAll();
+    }
+}
+
+The Sender uses the send() method to send data to the Receiver:
+    - If transfer is false, we’ll wait by calling wait() on this thread.
+    - But when it is true, we toggle the status, set our message, and call notifyAll() to wake up other threads to specify that a significant event has occurred 
+        and they can check if they can continue execution.
+
+Similarly, the Receiver will use the receive() method:
+    - If the transfer was set to false by Sender, only then will it proceed, otherwise we’ll call wait() on this thread.
+    - When the condition is met, we toggle the status, notify all waiting threads to wake up, and return the data packet that was received.
+
+Why Enclose wait() in a while Loop?
+Since notify() and notifyAll() randomly wake up threads that are waiting on this object’s monitor, it’s not always important that the condition is met. 
+Sometimes the thread is woken up, but the condition isn’t actually satisfied yet.
+
+We can also define a check to save us from spurious wakeups — where a thread can wake up from waiting without ever having received a notification.
+
+Why Do We Need to Synchronize send() and receive() Methods?
+We placed these methods inside synchronized methods to provide intrinsic locks. If a thread calling wait() method does not own the intrinsic lock, an error 
+will be thrown.
+
+public class Sender implements Runnable {
+    private Data data;
+ 
+    // standard constructors
+ 
+    public void run() {
+        String packets[] = {"First packet","Second packet","Third packet","Fourth packet","End"};
+ 
+        for (String packet : packets) {
+            data.send(packet);
+
+            try {
+                Thread.sleep(ThreadLocalRandom.current().nextInt(1000, 5000));  // Thread.sleep() to mimic heavy server-side processing
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); 
+                System.err.println("Thread Interrupted"); 
+            }
+        }
+    }
+}
+
+public class Receiver implements Runnable {
+    private Data data;
+ 
+    // standard constructors
+ 
+    public void run() {
+        for(String mssg = data.receive(); !"End".equals(mssg); mssg = data.receive()) {
+            
+            System.out.println(mssg + " received");
+
+            try {
+                Thread.sleep(ThreadLocalRandom.current().nextInt(1000, 5000));  //Thread.sleep() to mimic heavy server-side processing
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); 
+                System.err.println("Thread Interrupted"); 
+            }
+        }
+    }
+}
+
+public static void main(String[] args) {
+    Data data = new Data();
+    Thread sender = new Thread(new Sender(data));       // "data" is the lock object
+    Thread receiver = new Thread(new Receiver(data));   // "data" is the lock object here too.
+    
+    sender.start();
+    receiver.start();
+}

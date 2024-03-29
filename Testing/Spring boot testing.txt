@@ -1,0 +1,317 @@
+@SpringBootTest annotation tells Spring Boot to look for a main configuration class (one with @SpringBootApplication, for instance) and use 
+that to start a Spring application context.
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(
+  webEnvironment = SpringBootTest.WebEnvironment.MOCK,
+  classes = Application.class)
+@AutoConfigureMockMvc
+@TestPropertySource(locations = "classpath:application-integrationtest.properties")
+public class EmployeeRestControllerIntegrationTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private EmployeeRepository repository;
+
+    // write test cases here
+}
+
+The @SpringBootTest annotation is useful when we need to bootstrap the entire container. The annotation works by creating the ApplicationContext 
+that will be utilized in our tests.
+
+We can use the webEnvironment attribute of @SpringBootTest to configure our runtime environment; we’re using WebEnvironment.MOCK here so that the 
+container will operate in a mock servlet environment.
+
+Next, the @TestPropertySource annotation helps configure the locations of properties files specific to our tests. Note that the property file loaded with 
+@TestPropertySource will override the existing application.properties file.
+
+We might want to avoid bootstrapping the real application context but use a special test configuration. We can achieve this with the "@TestConfiguration" annotation
+There are two ways of using the annotation. Either on a static inner class in the same test class where we want to @Autowire the bean:
+
+@RunWith(SpringRunner.class)
+public class EmployeeServiceImplIntegrationTest {
+
+    @TestConfiguration
+    static class EmployeeServiceImplTestContextConfiguration {
+        @Bean
+        public EmployeeService employeeService() {
+            return new EmployeeService() {
+                // implement methods
+            };
+        }
+    }
+
+    @Autowired
+    private EmployeeService employeeService;
+}
+
+Or, we can create a separate test configuration class:
+
+@TestConfiguration
+public class EmployeeServiceImplTestContextConfiguration {
+    
+    @Bean
+    public EmployeeService employeeService() {
+        return new EmployeeService() { 
+            // implement methods 
+        };
+    }
+}
+
+Configuration classes annotated with @TestConfiguration are excluded from Component scanning. Therefore we need to import the class by @Import:
+
+@RunWith(SpringRunner.class)
+@Import(EmployeeServiceImplTestContextConfiguration.class)
+public class EmployeeServiceImplIntegrationTest {
+
+    @Autowired
+    private EmployeeService employeeService;
+
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+MOCKING WITH @MOCKBEAN
+
+Our Service layer code is dependent on our Repository:
+
+@Service
+public class EmployeeServiceImpl implements EmployeeService {
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @Override
+    public Employee getEmployeeByName(String name) {
+        return employeeRepository.findByName(name);
+    }
+}
+
+However, we dont need to know about the persistence layer. We should be able to write our tests without wiring into our persistence layer.
+We can use the mocking support provided by Spring Boot Test.
+
+@RunWith(SpringRunner.class)
+public class EmployeeServiceImplIntegrationTest {
+
+    @TestConfiguration
+    static class EmployeeServiceImplTestContextConfiguration {
+ 
+        @Bean
+        public EmployeeService employeeService() {
+            return new EmployeeServiceImpl();
+        }
+    }
+
+    @Autowired
+    private EmployeeService employeeService;
+
+    @MockBean
+    private EmployeeRepository employeeRepository;
+}
+
+To autowire the service class in our test, a Bean has to be available. We can achieve this configuration using the @TestConfiguration annotation.
+
+@MockBean is used to create a mock for our EmployeeRepository, which can be used to bypass the call to the actual EmployeeRepository class.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+INTEGRATION TEST WITH @DataJpaTest:
+
+@RunWith(SpringRunner.class) provides a bridge between Spring Boot test features and JUnit. Whenever we are using any Spring Boot testing features in 
+our JUnit tests, this annotation will be required.
+
+@DataJpaTest provides some standard setup needed for testing the persistence layer:
+
+    - configuring H2, an in-memory database
+    - setting Hibernate, Spring Data, and the DataSource
+    - performing an @EntityScan
+    - turning on SQL logging
+
+The Spring Boot "TestEntityManager" is an alternative to the standard JPA EntityManager that provides methods commonly used when writing tests.
+
+@RunWith(SpringRunner.class)
+@DataJpaTest
+public class EmployeeRepositoryIntegrationTest {
+
+    @Autowired
+    private TestEntityManager entityManager;
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @Test
+    public void whenFindByName_thenReturnEmployee() {
+        // given
+        Employee alex = new Employee("alex");
+        entityManager.persist(alex);
+        entityManager.flush();
+
+        // when
+        Employee found = employeeRepository.findByName(alex.getName());
+
+        // then
+        assertThat(found.getName())
+        .isEqualTo(alex.getName());
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+UNIT TESTING WITH @WebMvcTest:
+
+@RunWith(SpringRunner.class)
+@WebMvcTest(EmployeeRestController.class)
+public class EmployeeRestControllerIntegrationTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @MockBean
+    private EmployeeService service;
+}
+
+We’re only focused on the Controller code, it’s natural to mock the Service layer code for our unit tests
+
+To test the Controllers, we can use @WebMvcTest. It will auto-configure the Spring MVC infrastructure for our unit tests.
+
+In most cases, @WebMvcTest will be limited to bootstrapping a single controller. We can also use it along with @MockBean to provide mock implementations 
+for any required dependencies.
+
+@WebMvcTest also auto-configures MockMvc, which offers a powerful way of easy testing MVC controllers without starting a full HTTP server.
+
+@Test
+public void givenEmployees_whenGetEmployees_thenReturnJsonArray() throws Exception {
+    
+    Employee alex = new Employee("alex");
+
+    List<Employee> allEmployees = Arrays.asList(alex);
+
+    given(service.getAllEmployees()).willReturn(allEmployees);
+
+    mvc.perform(get("/api/employees")
+      .contentType(MediaType.APPLICATION_JSON))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$", hasSize(1)))
+      .andExpect(jsonPath("$[0].name", is(alex.getName())));
+}
+
+The get(…) method call can be replaced by other methods corresponding to HTTP verbs like put(), post(), etc.
+
+Spring Boot’s auto-configured annotations helps to load parts of the complete application and test-specific layers of the codebase instead of bootstrapping
+whole application.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+JUnit 5 defines an extension interface through which classes can integrate with the JUnit test.
+By adding the @ExtendWith annotation to our test classes and specifying the extension class to load. To run the Spring test, we use "SpringExtension.class"
+
+@ContextConfiguration annotation loads the context configuration and bootstrap the context that our test will use.
+
+@ExtendWith(SpringExtension.class)
+@ContextConfiguration(classes = { ApplicationConfig.class })
+@WebAppConfiguration
+public class GreetControllerIntegrationTest {
+    ....
+}
+
+In @ContextConfiguration, we provided the ApplicationConfig.class config class, which loads the configuration we need for this particular test.
+
+@WebAppConfiguration will load the web application context. By default, it looks for the root web application at path src/main/webapp. We can
+override this location by simply passing the value attribute  -->   @WebAppConfiguration(value = "").
+
+MockMvc provides support for Spring MVC testing. It encapsulates all web application beans and makes them available for testing.
+
+private MockMvc mockMvc;
+@BeforeEach
+public void setup() throws Exception {
+    this.mockMvc = MockMvcBuilders.webAppContextSetup(this.webApplicationContext).build();
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+WRITING INTEGRATION TESTS:
+
+1. VERIFY VIEW NAME:
+
+@Test
+public void givenHomePageURI_whenMockMVC_thenReturnsIndexJSPViewName() {
+    this.mockMvc.perform(get("/homePage")).andDo(print())
+      .andExpect(view().name("index"));
+}
+
+- perform() method will call a GET request method, which returns the ResultActions. Using this result, we can have assertion expectations 
+    about the response, like its content, HTTP status, or header.
+- andDo(print()) will print the request and response. This is helpful to get a detailed view in case of an error.
+- andExpect() will expect the provided argument. In our case, we’re expecting “index” to be returned via MockMvcResultMatchers.view().
+
+2. VERIFY RESPONSE BODY:
+
+The expected output will be:
+{
+    "id": 1,
+    "message": "Hello World!!!"
+}
+
+@Test
+public void givenGreetURI_whenMockMVC_thenVerifyResponse() {
+    MvcResult mvcResult = this.mockMvc.perform(get("/greet"))
+      .andDo(print()).andExpect(status().isOk())
+      .andExpect(jsonPath("$.message").value("Hello World!!!"))
+      .andReturn();
+    
+    Assert.assertEquals("application/json;charset=UTF-8", 
+      mvcResult.getResponse().getContentType());
+}
+
+- andExpect(MockMvcResultMatchers.status().isOk()) will verify that response HTTP status is Ok (200). This ensures that the request was successfully executed.
+- andExpect(MockMvcResultMatchers.jsonPath(“$.message”).value(“Hello World!!!”)) will verify that the response content matches with the 
+    argument “Hello World!!!” Here, we used jsonPath, which extracts the response content and provides the requested value.
+- andReturn() will return the MvcResult object, which is used when we have to verify something that isn’t directly achievable by the library. 
+    In this case, we’ve added assertEquals to match the content type of the response that is extracted from the MvcResult object.
+
+3. SEND GET REQUEST WITH PATH VARIABLE:
+{
+    "id": 1,                                          --> Output
+    "message": "Hello World John!!!"
+}
+
+@Test
+public void givenGreetURIWithPathVariable_whenMockMVC_thenResponseOK() {
+    this.mockMvc
+      .perform(get("/greetWithPathVariable/{name}", "John"))
+      .andDo(print()).andExpect(status().isOk())
+      
+      .andExpect(content().contentType("application/json;charset=UTF-8"))
+      .andExpect(jsonPath("$.message").value("Hello World John!!!"));
+}
+
+MockMvcRequestBuilders.get(“/greetWithPathVariable/{name}”, “John”) will send a request as “/greetWithPathVariable/John.”
+
+4. SEND GET REQUEST WITH QUERY PARAM:
+Expected output will be same as above.
+
+@Test
+public void givenGreetURIWithQueryParameter_whenMockMVC_thenResponseOK() {
+    this.mockMvc.perform(get("/greetWithQueryVariable")
+      .param("name", "John")).andDo(print()).andExpect(status().isOk())
+
+      .andExpect(content().contentType("application/json;charset=UTF-8"))
+      .andExpect(jsonPath("$.message").value("Hello World John!!!"));
+}
+
+param(“name”, "John") will append the query parameter in the GET request. This is similar to “/greetWithQueryVariable?name=John.“
+
+The query parameter can also be implemented using the URI template style:
+
+this.mockMvc.perform(get("/greetWithQueryVariable?name={name}", "John Doe"));
+
+5. SEND POST REQUEST:
+
+@Test
+public void givenGreetURIWithPost_whenMockMVC_thenVerifyResponse() {
+    this.mockMvc.perform(post("/greetWithPost")).andDo(print())
+      .andExpect(status().isOk()).andExpect(content().contentType("application/json;charset=UTF-8"))
+      .andExpect(jsonPath("$.message").value("Hello World!!!"));
+}
+
+MockMvcRequestBuilders.post(“/greetWithPost”) will send the POST request. We can set path variables and query parameters in a similar way as before, 
+whereas form data can be set only via the param() method, similar to query parameters as:
+
+http://localhost:8080/spring-mvc-test/greetWithPostAndFormData

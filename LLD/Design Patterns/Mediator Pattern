@@ -1,0 +1,150 @@
+Mediator is a behavioral design pattern that lets you reduce chaotic dependencies between objects. The pattern restricts direct communications between the 
+objects and forces them to collaborate only via a mediator object.
+
+Imagine creating and editing customer profiles. It consists of various form controls such as textfields, checkboxes, buttons.
+Some of the form elements may interact with other elements. If you write the logic for these interactions inside the form class, then you wont be able to re-use
+these intercation code anywhere else without code duplication.
+
+The Mediator pattern suggests that you should cease all direct communication between the components which you want to make independent of each other. Instead, 
+these components must collaborate indirectly, by calling a special mediator object that redirects the calls to appropriate components. As a result, the components 
+depend only on a single mediator class instead of being coupled to dozens of their colleagues.
+
+In our example with the profile editing form, the "Dialog" class itself may act as the mediator. 
+
+The most significant change happens to the actual form elements. Let’s consider the submit button. Previously, each time a user clicked the button, it had to validate 
+the values of all individual form elements. Now its single job is to notify the dialog about the click. Upon receiving this notification, the dialog itself performs 
+the validations or passes the task to the individual elements. Thus, instead of being tied to a dozen form elements, the button is only dependent on the dialog class.
+
+This way, the Mediator pattern lets you encapsulate a complex web of relations between various objects inside a single mediator object. The fewer dependencies a 
+class has, the easier it becomes to modify, extend or reuse that class.
+
+1. Components are various classes that contain some business logic. Each component has a reference to a mediator, declared with the type of the mediator interface. 
+The component isn’t aware of the actual class of the mediator, so you can reuse the component in other programs by linking it to a different mediator.
+
+2. The Mediator interface declares methods of communication with components, which usually include just a single notification method. Components may pass any context 
+as arguments of this method, including their own objects, but only in such a way that no coupling occurs between a receiving component and the sender’s class.
+
+3. Concrete Mediators encapsulate relations between various components. Concrete mediators often keep references to all components they manage and sometimes even manage 
+their lifecycle.
+
+4. Components must not be aware of other components. If something important happens within or to a component, it must only notify the mediator. When the mediator 
+receives the notification, it can easily identify the sender, which might be just enough to decide what component should be triggered in return.
+
+From a component’s perspective, it all looks like a total black box. The sender doesn’t know who’ll end up handling its request, and the receiver doesn’t know who 
+sent the request in the first place.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+interface ChatMediator {
+    void sendMessage(String message, User sender);
+}
+
+class ChatRoom implements ChatMediator {
+    public void sendMessage(String message, User sender) {
+        for (User user : users) {
+            if (user != sender) {
+                user.receiveMessage(message);
+            }
+        }
+    }
+}
+
+interface User {
+    void sendMessage(String message);
+    void receiveMessage(String message);
+}
+
+class ChatUser implements User {
+    private String name;
+    private ChatMediator mediator;
+
+    public ChatUser(String name, ChatMediator mediator) {
+        this.name = name;
+        this.mediator = mediator;
+    }
+
+    public void sendMessage(String message) {
+        System.out.println(name + " sends: " + message);
+        mediator.sendMessage(message, this);
+    }
+
+    public void receiveMessage(String message) {
+        System.out.println(name + " receives: " + message);
+    }
+}
+
+public class Application {
+    public static void main(String[] args) {
+        ChatMediator chatMediator = new ChatRoom();
+        
+        User user1 = new ChatUser("User1", chatMediator);
+        User user2 = new ChatUser("User2", chatMediator);
+        User user3 = new ChatUser("User3", chatMediator);
+        
+        user1.sendMessage("Hello, everyone!");
+        user2.sendMessage("Hi, User1!");
+        user3.sendMessage("Hey there!");
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+APPLICABILTY:
+
+- Use the Mediator pattern when it’s hard to change some of the classes because they are tightly coupled to a bunch of other classes.
+
+The pattern lets you extract all the relationships between classes into a separate class, isolating any changes to a specific component from the rest of the components.
+
+- Use the pattern when you can’t reuse a component in a different program because it’s too dependent on other components.
+
+After you apply the Mediator, individual components become unaware of the other components. They could still communicate with each other, albeit indirectly, through 
+a mediator object. To reuse a component in a different app, you need to provide it with a new mediator class.
+
+- Use the Mediator when you find yourself creating tons of component subclasses just to reuse some basic behavior in various contexts.
+
+Since all relations between components are contained within the mediator, it’s easy to define entirely new ways for these components to collaborate by introducing 
+new mediator classes, without having to change the components themselves.
+
+HOW TO IMPLEMENT:
+
+1. Identify a group of tightly coupled classes which would benefit from being more independent (e.g., for easier maintenance or simpler reuse of these classes).
+
+2. Declare the mediator interface and describe the desired communication protocol between mediators and various components. In most cases, a single method for 
+receiving notifications from components is sufficient.
+
+This interface is crucial when you want to reuse component classes in different contexts. As long as the component works with its mediator via the generic 
+interface, you can link the component with a different implementation of the mediator.
+
+3. Implement the concrete mediator class. Consider storing references to all components inside the mediator. This way, you could call any component from the 
+mediator’s methods. 
+
+4. You can go even further and make the mediator responsible for the creation and destruction of component objects. After this, the mediator may resemble 
+a factory or a facade.
+
+5. Components should store a reference to the mediator object. The connection is usually established in the component’s constructor, where a mediator 
+object is passed as an argument.
+
+6. Change the components’ code so that they call the mediator’s notification method instead of methods on other components. Extract the code that 
+involves calling other components into the mediator class. Execute this code whenever the mediator receives notifications from that component.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+RELATIONS WITH OTHER PATTERNS:
+
+- Chain of Responsibility, Command, Mediator and Observer address various ways of connecting senders and receivers of requests:
+
+    - Chain of Responsibility passes a request sequentially along a dynamic chain of potential receivers until one of them handles it.
+    - Command establishes unidirectional connections between senders and receivers.
+    - Mediator eliminates direct connections between senders and receivers, forcing them to communicate indirectly via a mediator object.
+    - Observer lets receivers dynamically subscribe to and unsubscribe from receiving requests.
+
+- Facade and Mediator have similar jobs: they try to organize collaboration between lots of tightly coupled classes.
+
+    - Facade defines a simplified interface to a subsystem of objects, but it doesn’t introduce any new functionality. The subsystem itself is unaware of the 
+    facade. Objects within the subsystem can communicate directly.
+    - Mediator centralizes communication between components of the system. The components only know about the mediator object and don’t communicate directly.
+
+- The difference between Mediator and Observer is often elusive. In most cases, you can implement either of these patterns; but sometimes you can apply both 
+simultaneously. Let’s see how we can do that.
+
+The primary goal of Mediator is to eliminate mutual dependencies among a set of system components. Instead, these components become dependent on a single 
+mediator object. The goal of Observer is to establish dynamic one-way connections between objects, where some objects act as subordinates of others.

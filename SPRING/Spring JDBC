@@ -1,0 +1,295 @@
+All the classes in Spring JDBC are divided into four separate packages:
+
+    - core — the core functionality of JDBC. Some of the important classes under this package include "JdbcTemplate", "SimpleJdbcInsert", "SimpleJdbcCall" & 
+        NamedParameterJdbcTemplate.
+
+    - datasource — utility classes to access a data source. It also has various data source implementations for testing JDBC code outside the Jakarta EE container.
+
+    - object — DB access in an object-oriented manner. It allows running queries and returning the results as a business object. It also maps the query results between 
+        the columns and properties of business objects.
+    
+    - support — support classes for classes under core and object packages, e.g., provides the SQLException translation functionality
+
+@Configuration
+@ComponentScan("com.baeldung.jdbc")          // same can be done using XML/application.properties file using spring data JPA(or spring boot jdbc)
+public class SpringJdbcConfig {
+    @Bean
+    public DataSource mysqlDataSource() {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+        dataSource.setDriverClassName("com.mysql.jdbc.Driver");
+        dataSource.setUrl("jdbc:mysql://localhost:3306/springjdbc");
+        dataSource.setUsername("guest_user");
+        dataSource.setPassword("guest_password");
+
+        return dataSource;
+    }
+}
+
+Here is a quick configuration that creates an instance of H2 embedded database and pre-populates it with simple SQL scripts:
+
+@Bean
+public DataSource dataSource() {
+    return new EmbeddedDatabaseBuilder()
+      .setType(EmbeddedDatabaseType.H2)
+      .addScript("classpath:jdbc/schema.sql")
+      .addScript("classpath:jdbc/test-data.sql").build();
+}
+
+The JdbcTemplate and Running Queries: The JDBC template is the main API through which we’ll access most of the functionality that we’re interested in:
+    - creation and closing of connections
+    - running statements and stored procedure calls
+    - iterating over the ResultSet and returning results
+
+int result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM EMPLOYEE", Integer.class);
+
+int id = jdbcTemplate.update("INSERT INTO EMPLOYEE VALUES (?, ?, ?, ?)", id, "Bill", "Gates", "USA");
+
+SqlParameterSource namedParameters = new MapSqlParameterSource().addValue("id", 1);        // querying with named parameters
+return namedParameterJdbcTemplate.queryForObject(
+  "SELECT FIRST_NAME FROM EMPLOYEE WHERE ID = :id", namedParameters, String.class);
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Mapping Query Results to Java Object:
+
+public class EmployeeRowMapper implements RowMapper<Employee> {
+    @Override
+    public Employee mapRow(ResultSet rs, int rowNum) throws SQLException {
+        Employee employee = new Employee();
+
+        employee.setId(rs.getInt("ID"));
+        employee.setFirstName(rs.getString("FIRST_NAME"));
+        employee.setLastName(rs.getString("LAST_NAME"));
+
+        return employee;
+    }
+}
+
+------------OR-----------
+
+public class EmployeeResultSetExtractor implements ResultSetExtractor {
+    @Override
+    public Object extractData(ResultSet rs) throws SQLException {
+        Employee person = new Employee();
+        employee.setFirstName(rs.getString(1));
+        employee.setLastName(rs.getString(2));
+        return person;
+    }
+}
+
+public class EmployeeRowMapper implements RowMapper {
+    @Override
+    public Object mapRow(ResultSet rs, int line) throws SQLException {
+        EmployeeResultSetExtractor extractor = new EmployeeResultSetExtractor();
+        return extractor.extractData(rs);
+    }
+}
+
+String query = "SELECT * FROM EMPLOYEE WHERE ID = ?";
+Employee employee = jdbcTemplate.queryForObject(query, new EmployeeRowMapper(), id);
+
+Exception Translation:
+Spring comes with its own data exception hierarchy out of the box — with DataAccessException as the root exception — and it translates all underlying raw exceptions 
+to it. We also benefit from the fact that Spring wraps the low-level exceptions in DataAccessException or one of its sub-classes.
+
+This also keeps the exception handling mechanism independent of the underlying database we are using. Besides the default SQLErrorCodeSQLExceptionTranslator, we can 
+also provide our own implementation of SQLExceptionTranslator.
+
+public class CustomSQLErrorCodeTranslator extends SQLErrorCodeSQLExceptionTranslator {
+    @Override
+    protected DataAccessException customTranslate(String task, String sql, SQLException sqlException) {
+        if (sqlException.getErrorCode() == 23505) {
+          return new DuplicateKeyException(
+            "Custom Exception translator - Integrity constraint violation.", sqlException);
+        }
+        return null;
+    }
+}
+
+CustomSQLErrorCodeTranslator customSQLErrorCodeTranslator = 
+  new CustomSQLErrorCodeTranslator();
+jdbcTemplate.setExceptionTranslator(customSQLErrorCodeTranslator);
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+SimpleJdbcInsert: The INSERT statement is generated based on the configuration of SimpleJdbcInsert. All we need is to provide the Table name, Column names and values.
+
+SimpleJdbcInsert simpleJdbcInsert = new SimpleJdbcInsert(dataSource).withTableName("EMPLOYEE");
+
+public int addEmplyee(Employee emp) {
+    Map<String, Object> parameters = new HashMap<String, Object>();
+    parameters.put("ID", emp.getId());
+    parameters.put("FIRST_NAME", emp.getFirstName());
+    parameters.put("LAST_NAME", emp.getLastName());
+    parameters.put("ADDRESS", emp.getAddress());
+
+    return simpleJdbcInsert.execute(parameters);
+}
+
+We can use the "executeAndReturnKey()" to allow the db to generate the primary key. We’ll also need to configure the actual auto-generated column:
+
+SimpleJdbcInsert simpleJdbcInsert = new SimpleJdbcInsert(dataSource)
+                                        .withTableName("EMPLOYEE")
+                                        .usingGeneratedKeyColumns("ID");
+
+Number id = simpleJdbcInsert.executeAndReturnKey(parameters);  // id - primary key
+
+Stored Procedures With SimpleJdbcCall:
+
+SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(dataSource)
+		                     .withProcedureName("READ_EMPLOYEE");
+
+public Employee getEmployeeUsingSimpleJdbcCall(int id) {
+    SqlParameterSource in = new MapSqlParameterSource().addValue("in_id", id);
+    Map<String, Object> out = simpleJdbcCall.execute(in);
+
+    Employee emp = new Employee();
+    emp.setFirstName((String) out.get("FIRST_NAME"));
+    emp.setLastName((String) out.get("LAST_NAME"));
+
+    return emp;
+}
+
+Basic Batch Operations Using JdbcTemplate:
+
+public int[] batchUpdateUsingJdbcTemplate(List<Employee> employees) {
+    return jdbcTemplate.batchUpdate("INSERT INTO EMPLOYEE VALUES (?, ?, ?, ?)",
+        new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                ps.setInt(1, employees.get(i).getId());
+                ps.setString(2, employees.get(i).getFirstName());
+                ps.setString(3, employees.get(i).getLastName());
+                ps.setString(4, employees.get(i).getAddress());
+            }
+            @Override
+            public int getBatchSize() {
+                return 50;
+            }
+        });
+}
+
+We also have the option of batching operations with the NamedParameterJdbcTemplate – batchUpdate() API. This API is simpler than the previous one. So, there’s no need 
+to implement any extra interfaces to set the parameters, as it has an internal prepared statement setter to set the parameter values.
+Instead, the parameter values can be passed to the batchUpdate() method as an array of SqlParameterSource
+
+SqlParameterSource[] batch = SqlParameterSourceUtils.createBatch(employees.toArray());
+int[] updateCounts = namedParameterJdbcTemplate.batchUpdate(
+    "INSERT INTO EMPLOYEE VALUES (:id, :firstName, :lastName, :address)", batch);
+return updateCounts;
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Convert ResultSet Into Map:
+
+@Test
+void whenUsingContainsKey_thenConvertResultSetToMap() throws SQLException {
+    ResultSet resultSet = connection.prepareStatement("SELECT * FROM employee").executeQuery();  // Employee Table has ID, Name, City colmuns
+    Map<String, List<String>> valueMap = new HashMap<>(); 
+
+    while (resultSet.next()) {
+        String empCity = resultSet.getString("empCity");
+        String empName = resultSet.getString("empName");
+        if (!valueMap.containsKey(empCity)) {
+            valueMap.put(empCity, new ArrayList<>());
+        }
+        valueMap.get(empCity).add(empName);
+
+        // valueMap.computeIfAbsent(empCity, data -> new ArrayList<>()).add(empName);   --> Using java 8 lambda expression
+    }
+    assertEquals(3, valueMap.get("London").size());
+}
+
+Get the Number of Rows in a ResultSet:
+1. One way is to iterate through every row using resultSet.next(). This works with every db:
+
+    try (Statement statement = conn.createStatement();
+        ResultSet resultSet = statement.executeQuery(query)) {
+        int size = 0;
+        while (resultSet.next()) size++;
+        return size;
+    }
+
+2. Scrollable ResultSet:
+By using the overloaded Statement method createStatement, we can ask for a scrollable ResultSet to be created after query execution. With the scrollable version, we 
+can use more advanced traversal methods like previous to move backward. For counting no. of rows, we can use last() method to jump to the last row & get the row no.
+using getRow().
+
+    try (Statement statement = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE); // Not all JDBC drivers support this type
+        ResultSet resultSet = statement.executeQuery(query)) {
+        resultSet.last();
+        return resultSet.getRow();
+    }
+
+3. Use a SQL statement to get the count of rows using COUNT method.
+
+int result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM EMPLOYEE", Integer.class);
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+JDBC ResultSet Interface:
+The ResultSet is a table of data generated by executing database queries.
+
+The ResultSet object maintains a cursor that points to the current row of the result set. We’ll use next() on our ResultSet to iterate through the records.
+Next, we’ll use the getXXXX() methods while iterating through the results to fetch the values from the db columns, where XXXX is the datatype of the column
+
+PreparedStatement pstmt = conn.prepareStatement("select * from employees");
+ResultSet rs = pstmt.executeQuery();
+
+while(rs.next()) {
+    String name = rs.getString("name");           // rs.getString(1);   column number
+    Integer empId = rs.getInt("emp_id");          // rs.getInt(2);
+    Double salary = rs.getDouble("salary");       // rs.getDouble(3);
+    String position = rs.getString("position");
+}
+
+Retrieving metadata from the result set:
+    ResultSetMetaData metaData = rs.getMetaData();
+    Integer columnCount = metaData.getColumnCount();
+
+There are many methods to get different metadata from the resultset: getColumnName(int colNum), getColumnLabel(int colNum), getTableName(int colNum), 
+getColumnClassName(int colNum), getColumnClassName(int colNum), isAutoIncrement(int colNum), isNullable(int colNum) etc.
+
+Result Set Types : Refer Java JDBC file 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Fetch Size: Typically, when loading data into a ResultSet, the db drivers decide on the number of rows to fetch from the db. On a MySQL db, the ResultSet normally 
+loads all the records into memory at once.
+
+Sometimes, however, we may need to deal with a large number of records that won’t fit into our JVM memory. In this case, we can use the fetch size property either 
+on our Statement or ResultSet objects to limit the number of records initially returned.
+
+Whenever additional results are required, ResultSet fetches another batch of records from the database. Using the fetch size property, we can provide a suggestion 
+to the database driver on the number of rows to fetch per database trip. The fetch size we specify will be applied to the subsequent database trips.
+
+If we don’t specify the fetch size for our ResultSet, then the fetch size of the Statement is used. If we don’t specify fetch size for either the Statement or the 
+ResultSet, then the database default is used.
+
+Using Fetch Size on Statement:
+    PreparedStatement pstmt = conn.prepareStatement("select * from employees", 
+                        ResultSet.TYPE_SCROLL_SENSITIVE, 
+                        ResultSet.CONCUR_READ_ONLY);
+    pstmt.setFetchSize(10);      // fetch sixe specified on Statement.
+
+    ResultSet rs = pstmt.executeQuery();    
+
+Using Fetch Size on ResultSet:
+    // same as above code
+    
+    rs.setFetchSize(20);   // This will override the fetch size we earlier specified on our Statement
+
+Dynamically setting the fetch size while iterating the result set:
+    PreparedStatement pstmt = dbConnection.prepareStatement("select * from employees", 
+                            ResultSet.TYPE_SCROLL_SENSITIVE, 
+                            ResultSet.CONCUR_READ_ONLY);
+    pstmt.setFetchSize(10);
+
+    ResultSet rs = pstmt.executeQuery();
+
+    int rowCount = 0;
+
+    while (rs.next()) { 
+        if (rowCount == 30) rs.setFetchSize(20); 
+
+        rowCount++;
+    }

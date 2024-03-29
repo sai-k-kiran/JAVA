@@ -1,0 +1,124 @@
+Spring AOP (Aspect-Oriented Programming) is a feature of the Spring Framework that allows developers to define certain behaviors 
+(i.e., “aspects”) that cut across multiple classes, such as logging or transaction management. 
+AOP is a programming paradigm that aims to increase modularity by allowing the separation of cross-cutting concerns. It does this by 
+adding additional behavior to existing code without modifying the code itself.
+
+These cut across multiple classes are cross cutting concerns or "advices". These advices are methods which are used extensively
+in an appliation like logging etc. So if we want to run another method before, after, after returning, after exception etc, we can do that 
+by creating aspects and applying aspects on that method.
+
+To apply an aspect on a method, that aspect should be in spring container
+
+EXAMPLE -- 
+
+@Service
+public class helloService {    --> helloService component in services package
+    public String helloName(String name){
+        String res = "Hello " + name;
+        return res;
+    }
+}
+ 
+@Before("execution(* services.helloService.helloName(..))")  --> aspect applied in helloName() method from services/helloService Component
+public void before(){
+    System.out.println("Before running helloName()");
+}
+
+public static void main(String[] args) {
+    AnnotationConfigApplicationContext context =
+            new AnnotationConfigApplicationContext(ProjectConfig.class);
+
+    helloService hello = context.getBean(helloService.class);
+
+    System.out.println(hello.helloName("Sai"));
+}
+
+OUTPUT -->
+Before running helloName()
+Hello Sai
+---------------------------------------------------------------------------------------------------------------
+
+TERMINOLOGIES -->
+
+Join point: a point during the execution of a program, such as the execution of a method or the handling of an exception. In Spring AOP, a join 
+point always represents a method execution. Joinpoint represents the method we are intercepting. If we are intercepting helloName(), then the
+joinPoint will be helloName(). You can also call joinPoint as a point during execution of a program/method
+
+Advice: action taken by an aspect at a particular join point. Different types of advice include "around," "before" and "after" advice. Many AOP 
+frameworks, including Spring, model an advice as an interceptor, maintaining a chain of interceptors around the join point.
+
+Pointcut: a predicate that matches join points. Advice is associated with a pointcut expression and runs at any join point matched by the pointcut 
+(for example, the execution of a method with a certain name). The concept of join points as matched by pointcut expressions is central to AOP, and 
+Spring uses the AspectJ pointcut expression language by default.
+
+Introduction: declaring additional methods or fields on behalf of a type. Spring AOP allows you to introduce new interfaces (and a corresponding 
+implementation) to any advised object. For example, you could use an introduction to make a bean implement an isModified interface, to simplify 
+caching. (An introduction is known as an inter-type declaration in the AspectJ community.)
+
+Target object: object being advised by one or more aspects. Also referred to as the advised object. Since Spring AOP is implemented using runtime proxies,
+this object will always be a proxied object.
+
+AOP proxy: an object created by the AOP framework in order to implement the aspect contracts (advise method executions and so on). In the Spring Framework, 
+an AOP proxy will be a JDK dynamic proxy or a CGLIB proxy.
+
+Weaving: linking aspects with other application types or objects to create an advised object. This can be done at compile time (using the AspectJ compiler, 
+for example), load time, or at runtime. Spring AOP, like other pure Java AOP frameworks, performs weaving at runtime.
+
+Types of advice:
+
+Before advice: Advice that executes before a join point, but which does not have the ability to prevent execution flow proceeding to the join point 
+(unless it throws an exception).
+
+After returning advice: Advice to be executed after a join point completes normally: for example, if a method returns without throwing an exception.
+
+After throwing advice: Advice to be executed if a method exits by throwing an exception.
+
+After (finally) advice: Advice to be executed regardless of the means by which a join point exits (normal or exceptional return).
+
+Around advice: Advice that surrounds a join point such as a method invocation. This is the most powerful kind of advice. Around advice can perform custom 
+behavior before and after the method invocation. It is also responsible for choosing whether to proceed to the join point or to shortcut the advised method 
+execution by returning its own return value or throwing an exception.
+
+Around advice is the most general kind of advice. Since Spring AOP, like AspectJ, provides a full range of advice types, we recommend that you use the least 
+powerful advice type that can implement the required behavior. For example, if you need only to update a cache with the return value of a method, you are better 
+off implementing an after returning advice than an around advice, although an around advice can accomplish the same thing. Using the most specific advice type 
+provides a simpler programming model with less potential for errors. For example, you do not need to invoke the proceed() method on the JoinPoint used for around 
+advice, and hence cannot fail to invoke it.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+@Aspect
+@Component
+public class helloAspect {
+
+    @Around("execution(* services.helloService.helloName(..))") --> Around() advice around()
+    public Object around(ProceedingJoinPoint joinPoint){
+        System.out.println("Around aspect running");
+        return "something";
+    }
+
+    @Around("execution(* services.helloService.helloName(..))") --> Around() advice around1()
+    public Object around1(ProceedingJoinPoint joinPoint){
+        System.out.println("Around aspect running");
+        Object res = null;
+        try{
+            res = joinPoint.proceed();
+            System.out.println("Object found");
+        } catch (Throwable throwable){
+            throwable.printStackTrace();
+        }
+        return res;
+    }
+}
+
+around() aspect completely swallows the given joinPoint(helloName() here). That means whatever the helloName() func() is gonna return, is completely lost & is 
+replaced by the return value of around() that is "something".
+
+In around1() advice, the advice first prints "Around aspect running". Then the aspect will try to assign the value returned by joinPoint method(helloName() here) 
+to Object res by using proceed() method. proceed() is a joinPoint method used to get a returned value by a joinPoint on which is called.
+
+In res = joinPoint.proceed(), res will be "Hello {name}" from helloName(name) func(). Then it prints "Object found"
+
+If joinPoint.proceed() doesnt returns a value, then the catch block will run & error will be printed
+
+From around() & around1() aspect methods, only around() will run because it is first found(written in code)

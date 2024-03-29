@@ -1,0 +1,347 @@
+Java 5 first introduced the enum keyword. It denotes a special type of "CLASS" that always extends the java.lang.Enum class.
+
+Constants defined this way make the code more readable, allow for compile-time checking, document the list of accepted values upfront(in IDE), and avoid unexpected 
+behavior due to invalid values being passed in.
+
+You should use enum types any time you need to represent a fixed set of constants. Enum constants are implicitly static final 
+
+enum Size { 
+   SMALL, MEDIUM, LARGE, EXTRALARGE  // enum constants, usually represented in uppercase.
+}
+
+class Main {
+   public static void main(String[] args) {
+      System.out.println(Size.SMALL);     // SMALL
+      System.out.println(Size.MEDIUM);    // MEDIUM
+   }
+}
+
+Benefits of using Enums in Java
+    - Enum is type-safe you can not assign anything else other than predefined Enum constants to an Enum variable.
+    - Enum has its own namespace.
+    - The best feature of Enum is you can use Enum in Java inside Switch statements like int or char primitive data type
+
+The enum declaration defines a class(called an enum type). The enum class body can include methods and other fields. The compiler automatically adds some special 
+methods when it creates an enum. For ex, they have a static values() method that returns an array containing all of the values of the enum in the order they are declared.
+
+for (Size s : Size.values()) 
+    System.out.printf(s);
+
+If enum constant is declared with values, the values are passed to the constructor when the constant is created. Java requires that the constants be defined first, 
+prior to any fields or methods. Also, when there are fields and methods, the list of enum constants must end with a semicolon.
+
+NOTE: The constructor for an enum type must be package-private or private access. It automatically creates the constants that are defined at the beginning of the enum 
+body. You cannot invoke an enum constructor yourself because the constructor is private. Package-private in Enum = private
+
+An instance of Enum in Java is created when any Enum constants are first called or referenced in code.
+
+Enum in Java can implement the interface and override any method like a normal class It’s also worth noting that Enum in java implicitly implements both Serializable 
+and Comparable interfaces
+
+public enum Currency {
+    PENNY(1), NICKLE(5), DIME(10), QUARTER(25);
+    private int value;    // value var is available for every enum constant
+
+    private Currency(int value) {
+        this.value = value;
+    }
+}; 
+
+public enum Planet {
+    MERCURY (3.303e+23, 2.4397e6),     // calling the constructor
+    VENUS   (4.869e+24, 6.0518e6),
+    EARTH   (5.976e+24, 6.37814e6),
+    ...
+
+    private final double mass;  
+    private final double radius;
+
+    Planet(double mass, double radius) {  // package-private/default constructor means same as private in case of Enum
+        this.mass = mass; 
+        this.radius = radius;
+    }
+}
+
+Since constants defined inside Enum in Java are final you can safely compare them using "==", the equality operator.(NOT RECOMMENDED)
+
+METHODS OF ENUM:
+
+1. ordinal(): returns the position of an enum constant.
+    ordinal(MERCURY)  // returns 0
+
+2. compareTo(): compares the enum constants based on their ordinal value
+    Planet.SATURN.compareTo(Planet.EARTH) // (5 - 2) = 3    
+
+3. toString(): returns the string representation of the enum constants
+    NEPTUNE.toString()  // NEPTUNE
+
+4. name(): returns the defined name of an enum constant in string form. The returned value from the name() method is final. We cannot override the name() method
+    name(EARTH)  // EARTH
+
+5. valueOf(String s): takes a string and returns an enum constant having the same string name. Converts string into Enum
+    Planet.valueOf(URANUS)  // URANUS
+
+6. values(): returns an array of the enum type containing all the enum constants. 
+    Planet[] planets = Planet.values();  // [MERCURY, VENUS, EARTH...]
+
+enum Size {
+   SMALL("The size is small."),
+   MEDIUM("The size is medium."),
+   LARGE("The size is large."),
+   EXTRALARGE("The size is extra large.");
+
+   private final String pizzaSize;
+
+   private Size(String pizzaSize) {
+      this.pizzaSize = pizzaSize;
+   }
+
+   public String getSize() {
+      return pizzaSize;
+   }
+
+    @Override
+    public String toString() {
+        switch (this) {
+            case SMALL:
+                System.out.println("Size: " + SMALL);
+                break;
+            }
+        return super.toString();
+    }
+}
+
+class Main {
+   public static void main(String[] args) {
+      Size size = Size.SMALL;   // calling the constructor with param SMALL
+      System.out.println(size.getSize());  // "The size is small."
+   }
+}
+
+We can change the default string representation of enum constants by overriding the toString() method.
+
+enum Size {
+   SMALL {
+      public String toString() {
+        return "The size is small.";
+      }
+   },
+
+   MEDIUM {
+      public String toString() {
+        return "The size is medium.";
+      }
+   };
+}
+
+In Java, enum classes are final by default. Hence, we cannot inherit other classes from it.
+We cannot extend enum classes in Java. It is because all enums in Java are inherited from java.lang.Enum & multiple inheritance is not supported.
+
+we cannot inherit enum classes in Java. However, enum classes can implement interfaces.
+
+interface Pizza {
+     public void displaySize();
+}
+
+enum Size implements Pizza {
+    SMALL, MEDIUM, LARGE, EXTRALARGE;
+
+    public void displaySize() {
+    System.out.println("The size is " + this);
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+    Size.MEDIUM.displaySize();    // The size is MEDIUM
+    }
+}
+
+You can define abstract methods inside Enum in Java and can also provide a different implementation for different instances of enum in java
+
+ public enum Currency {
+        PENNY(1) {
+            @Override
+            public String color() {
+                return "copper";
+            }
+        },
+        NICKLE(5) {
+            @Override
+            public String color() {
+                return "bronze";
+            }
+        };
+
+        private int value;
+
+        public abstract String color();  // abstract method
+
+        private Currency(int value) {
+            this.value = value;
+        }
+}     
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Persisting Enums in JPA:
+
+The most common option to map an enum value to and from its database representation in JPA before 2.1 is to use the @Enumerated annotation. This way, we can instruct 
+a JPA provider to convert an enum to its ordinal or String value.
+
+public enum Status {
+    OPEN, REVIEW, APPROVED, REJECTED;
+}
+
+@Entity
+public class Article {
+    @Id
+    private int id;
+    private String title;
+
+    @Enumerated(EnumType.ORDINAL)     // @Enumerated(EnumType.ORDINAL) on the enum field will use ordinal() (position) value when persisting a given entity in db.
+    private Status status;            // if status = OPEN, it will store status = 0 in db. If status = null, it will store null in db
+}
+
+A problem arises with this kind of mapping is when we need to modify our enum. If we add a new value in the middle or rearrange the enum’s order, we’ll break the 
+existing data model.
+
+Analogously, JPA will use the Enum.name() value when storing an entity if we annotate the enum field with @Enumerated(EnumType.STRING).
+
+    @Enumerated(EnumType.STRING)  
+    private Status status;  // if status = OPEN, it will store status = OPEN in db
+
+With @Enumerated(EnumType.STRING), we can safely add new enum values or change our enums’ order. However, renaming an enum value will still break the database data.
+But as this annotation will store the sum as VARCHAR, it will take more space.
+
+Using @PostLoad and @PrePersist Annotations:
+Another option we have to deal with persisting enums in a db is to use standard JPA callback methods. We can map our enums back and forth in the @PostLoad and 
+@PrePersist events. The idea is to have two attributes in an entity. The first one is mapped to a database value, and the second one is a @Transient field that 
+holds a real enum value. The transient attribute is then used by the business logic code.
+
+public enum Priority {
+    LOW(100), MEDIUM(200), HIGH(300);
+
+    private int priority;
+
+    private Priority(int priority) {
+        this.priority = priority;
+    }
+
+    public int getPriority() {
+        return priority;
+    }
+
+    public static Priority of(int priority) {
+        return Stream.of(Priority.values())
+          .filter(p -> p.getPriority() == priority)
+          .findFirst()
+          .orElseThrow(IllegalArgumentException::new);
+    }
+}
+
+@Entity
+public class Article {
+    @Id
+    private int id;
+
+    @Enumerated(EnumType.ORDINAL)
+    private Status status;
+
+    @Basic
+    private int priorityValue;
+
+    @Transient
+    private Priority priority;
+
+    @PostLoad
+    void fillTransient() {
+        if (priorityValue > 0) {
+            this.priority = Priority.of(priorityValue);
+        }
+    }
+
+    @PrePersist
+    void fillPersistent() {
+        if (priority != null) {
+            this.priorityValue = priority.getPriority();
+        }
+    }
+}
+
+Article article = new Article();
+article.setId(3);
+article.setPriority(Priority.HIGH);  // 300
+
+Using JPA 2.1 @Converter Annotation:
+A new standardized API that can be used to convert an entity attribute to a database value and vice versa. As a rule of thumb, we should always use AttributeConverter 
+interface and @Converter annotation if we’re using JPA 2.1 or later.
+
+public enum Category {      // You can use a POJO class with a string field to represent different enums
+    SPORT("S"), MUSIC("M"), TECHNOLOGY("T");
+
+    private String code;
+
+    private Category(String code) {
+        this.code = code;
+    }
+
+    public String getCode() {
+        return code;
+    }
+}
+
+@Converter(autoApply = true)
+public class CategoryConverter implements AttributeConverter<Category, String> {
+    @Override
+    public String convertToDatabaseColumn(Category category) {  // abstract method of AttributeConverter interface
+        if (category == null) return null;
+        return category.getCode();  // return value of the enum
+    }
+
+    @Override
+    public Category convertToEntityAttribute(String code) {
+        if (code == null) return null;
+
+        return Stream.of(Category.values()) // return the enum from the value
+          .filter(c -> c.getCode().equals(code))
+          .findFirst()
+          .orElseThrow(IllegalArgumentException::new);
+    }
+}
+
+@Entity
+public class Article {
+    @Id
+    private int id;
+
+    @Convert(converter = CategoryConverter.class )
+    private Category category;
+}
+
+Article article = new Article();
+article.setId(4);
+article.setCategory(Category.MUSIC);  // category = M
+
+Using Enums in JPQL:
+
+String jpql = "select a from Article a where a.category = com.baeldung.jpa.enums.Category.SPORT";   // fully qualified name (imp)
+List<Article> articles = em.createQuery(jpql, Article.class).getResultList();
+                         OR
+String jpql = "select a from Article a where a.category = :category";
+
+TypedQuery<Article> query = em.createQuery(jpql, Article.class);
+query.setParameter("category", Category.TECHNOLOGY);
+
+List<Article> articles = query.getResultList();
+
+NOTE: Some databases, like PostgreSQL, provide a dedicated column type to store enum values.
+
+    CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
+    CREATE TABLE person (
+        name text,
+        current_mood mood
+    );
+    INSERT INTO person VALUES ('Moe', 'happy');
+
+Enum aren't entities nor associations.**Maybe** annotating them using @Entity will work if you specify an id and not use @Generated

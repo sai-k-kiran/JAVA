@@ -1,0 +1,270 @@
+* CUSTOM ANNOTATIONS
+
+Java annotations are a mechanism for adding metadata information to our source code. They’re a powerful part of Java that was added in JDK5. Annotations offer an 
+alternative to the use of XML descriptors and marker interfaces.
+
+Although we can attach them to packages, classes, interfaces, methods, and fields, annotations by themselves have no effect on the execution of a program.
+
+Class Level Annotation:
+
+@Retention(RetentionPolicy.RUNTIME)         // meta-annotations to specify the scope
+@Target(ElementType.Type)                   // meta-annotations to specify the target. TYPE = Type(for class)
+public @interface JsonSerializable {
+}
+
+Field Level Annotation:                                             |                  Method Level Annotation:
+                                                                    |
+@Retention(RetentionPolicy.RUNTIME)                                 |                  @Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.FIELD)        /* TYPE = FIELD(for fields) */    |                  @Target(ElementType.METHOD)     /* TYPE = METHOD(for methods) */
+public @interface JsonElement {                                     |                  public @interface Init {
+    public String key() default "";                                 |                  }
+}
+
+The annotation declares one String parameter with the name “key” and an empty string as the default value.
+
+public class JsonSerializationException extends RuntimeException {
+
+    private static final long serialVersionUID = 1L;
+
+    public JsonSerializationException(String message) {
+        super(message);
+    }
+}
+
+Object to JSON converter class:
+
+public class ObjectToJsonConverter {
+    public String convertToJson(Object object) throws JsonSerializationException {
+        try {
+            checkIfSerializable(object);
+            initializeObject(object);
+            return getJsonString(object);
+        } catch (Exception e) 
+            throw new JsonSerializationException(e.getMessage());
+    }
+
+    private void checkIfSerializable(Object object) {
+        if (Objects.isNull(object))          // If object is null
+            throw new JsonSerializationException("Can't serialize a null object");
+
+        Class<?> clazz = object.getClass();
+        if (!clazz.isAnnotationPresent(JsonSerializable.class)) {   // If class is not annotated with @JsonSerializable
+            throw new JsonSerializationException("The class " + clazz.getSimpleName() + " is not annotated with JsonSerializable");
+        }
+    }
+
+    private void initializeObject(Object object) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        Class<?> clazz = object.getClass();
+        for (Method method : clazz.getDeclaredMethods()) {
+            if (method.isAnnotationPresent(Init.class)) {
+                method.setAccessible(true);
+                method.invoke(object);     // invoke the setter & getter methods of Person object
+            }
+        }
+    }
+
+    private String getJsonString(Object object) throws IllegalArgumentException, IllegalAccessException {
+        Class<?> clazz = object.getClass();
+        Map<String, String> jsonElementsMap = new HashMap<>();
+            
+        for (Field field : clazz.getDeclaredFields()) {
+            field.setAccessible(true);
+            if (field.isAnnotationPresent(JsonElement.class)) 
+                jsonElementsMap.put(getKey(field), (String) field.get(object));
+        }
+
+        String jsonString = jsonElementsMap.entrySet()
+            .stream()
+            .map(entry -> "\"" + entry.getKey() + "\":\"" + entry.getValue() + "\"")
+            .collect(Collectors.joining(","));
+        return "{" + jsonString + "}";
+    }
+
+    private String getKey(Field field) {
+        String value = field.getAnnotation(JsonElement.class).key();
+        return value.isEmpty() ? field.getName() : value;
+    }
+}
+
+@JsonSerializable
+public class Person {
+    @JsonElement
+    private String firstName;
+
+    @JsonElement
+    private String lastName;
+
+    @JsonElement(key = "personAge")
+    private String age;
+
+    private String address;
+
+    public Person(String firstName, String lastName) {
+        super();
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    public Person(String firstName, String lastName, String age) {
+        // this.firstName = firstName  ...
+    }
+
+    @Init
+    private void initNames() {
+        this.firstName = this.firstName.substring(0, 1).toUpperCase() + this.firstName.substring(1);  // First letter capital
+        this.lastName = this.lastName.substring(0, 1).toUpperCase() + this.lastName.substring(1);
+    }
+
+}
+
+@Test
+public void givenObjectSerializedThenTrueReturned() throws JsonSerializationException {
+    Person person = new Person("soufiane", "cheouati", "34");
+    ObjectToJsonConverter serializer = new ObjectToJsonConverter(); 
+
+    String jsonString = serializer.convertToJson(person);
+    assertEquals("{\"personAge\":\"34\",\"firstName\":\"Soufiane\",\"lastName\":\"Cheouati\"}", jsonString);
+}
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+CommandLineRunner interface:
+CommandLineRunner is an interface used to execute some specific tasks or code blocks after a Spring Boot application starts. After the application has finished starting, 
+Spring Boot will look for and execute any beans that have implemented the CommandLineRunner interface. It is a functional interface which contains one abstract method 
+"run()" & can therefore be used as the assignment target for a lambda expression or method reference.
+
+Spring boot’s CommandLineRunner interface is used to run a code block only once in application’s lifetime – after application is initialized. 
+If you need access to ApplicationArguments instead of the raw String array consider using ApplicationRunner. It can be used to:
+
+1) Database Initialization - You can use CommandLineRunner to perform db initialization operations when the app starts, such as creating tables/inserting initial data.
+
+2) Cache Preheating - It can preheat the cache after the application starts, loading commonly used data into the cache to improve the application's response speed.
+
+3) Loading External Resources - Load some external resources, such as configuration files, static files, or other resources. CommandLineRunner can help you read these 
+    resources at startup and perform the corresponding processing.
+
+4) Task Initialization - Use CommandLineRunner to initialize and configure some scheduled tasks to ensure they start running immediately after the application starts.
+
+5) Logging - Log some necessary information after SpringBoot starts, such as the application version, environmental configurations, or even the startup time
+
+6) Component Initialization - You might need to initialize some components in a specific order, and CommandLineRunner can help you control the initialization order. 
+    Just add them to different CommandLineRunner implementation classes and use the @Order annotation to specify their execution order.
+
+NOTE: It is important to note that if any exceptions are thrown inside the run(String… args) method, this will cause the context to close and an application to shut 
+down. So put risky code in try-catch block – ALWAYS.
+
+
+1) Using CommandLineRunner as @Component:
+    @Component                      
+    public class StartupRunner implements CommandLineRunner {
+        protected final Log logger = LogFactory.getLog(getClass());
+
+        @Override
+        public void run(String... args) throws Exception {
+            logger.info("ApplicationStartupRunner run method Started !!");
+        }
+    }
+
+2) Implement CommandLineRunner in @SpringBootApplication:
+
+    @SpringBootApplication
+    public class SpringBootWebApplication extends SpringBootServletInitializer implements CommandLineRunner {
+        @Override
+        protected SpringApplicationBuilder configure(SpringApplicationBuilder application) {
+            return application.sources(SpringBootWebApplication.class);
+        }
+
+        public static void main(String[] args) throws Exception {
+            SpringApplication.run(SpringBootWebApplication.class, args);
+        }
+
+        @Override
+        public void run(String... args) throws Exception {
+            logger.info("Application Started !!");
+        }
+    }
+
+3) Using CommandLineRunner as Bean:
+
+    @Bean
+    CommandLineRunner lookupTestService(TestService testService) {
+        return args -> {
+            service.test();   // calling Service class's method
+        };
+    }
+
+* Using @Order if multiple CommandLineRunner interface implementations:
+
+@Order(value=3)
+@Component
+class ApplicationStartupRunnerOne implements CommandLineRunner {
+	protected final Log logger = LogFactory.getLog(getClass());
+
+	@Override
+	public void run(String... args) throws Exception {
+		logger.info("Command line runner 1");
+	}
+}
+
+@Order(value=2)
+@Component
+class ApplicationStartupRunnerTwo implements CommandLineRunner {
+	protected final Log logger = LogFactory.getLog(getClass());
+
+	@Override
+	public void run(String... args) throws Exception {
+		logger.info("Command line runner 2");
+	}
+}
+
+OP: 
+    2017-03-08 13:55:04 - Command line runner 2    // order 2 
+    2017-03-08 13:55:04 - Command line runner 1    // order 3
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+@GeneratedValue:
+The @GeneratedValue is considered the entry point for primary key generation, it provides the specification of generation strategies for the values of primary keys.
+The values that can be used in @GeneratedValue are defined in GenerationType.java
+
+    public enum GenerationType {TABLE, SEQUENCE, IDENTITY, AUTO};
+    
+    - IDENTITY allows using a table identity column, like the MySQL AUTO_INCREMENT. For JPA and Hibernate, you should prefer using SEQUENCE if the relational db 
+        supports it because Hibernate cannot use automatic JDBC batching when persisting entities using the IDENTITY generator.
+    - SEQUENCE allows using a db sequence object to generate identifier values. This is the best generation strategy when using JPA and Hibernate.
+    - TABLE emulates the database sequence generator using a separate table. This is a terrible strategy, and you shouldn’t use it.
+    - AUTO picks any of the previous strategy based on the underlying database capabilities.
+
+The @SequenceGenerator annotation allows you to customize the database sequence generation process.
+
+When we use strategy = GenerationType.SEQUENCE, then hibernate creates a sequence for us. "hibernate_sequence" is used for all entities using SEQUENCE identifier 
+generation strategy without explicit db sequence name.
+
+    CREATE SEQUENCE hibernate_sequence START 1 INCREMENT 1    // hibernate SQL statements
+    
+    CREATE TABLE post (
+        id INT8 NOT NULL,
+        title VARCHAR(255),
+        PRIMARY KEY (id)
+    )
+
+Everytime we call persist(), save() or any other saving method, the "hibernate_sequence" is incremented. Its start value is 1.
+
+JPA @SequenceGenerator:
+
+If you want to customize the sequence generation process, you need to use the @SequenceGenerator annotation. For ex, if we want to specify a custom db sequence name, 
+like "seq_post", which uses an increment step of 5, then:
+
+    @Id
+    @GeneratedValue(
+        strategy = GenerationType.SEQUENCE,
+        generator = "seq_post"       // references the name attribute of the @SequenceGenerator annotation.
+    )
+    @SequenceGenerator(
+        name = "seq_post",   // reference the db sequence object that’s called to get the new entity identifiers.
+        allocationSize = 5   // increment step
+    )
+    private Long id;
+
+    CREATE SEQUENCE seq_post START 1 INCREMENT 5
+
+Here the db sequence name will be "seq_post", & not hibernate_sequence.

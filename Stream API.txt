@@ -1,0 +1,578 @@
+STREAM API:
+
+Stream API in java is an object which implements map, filter, reduce pattern. It is like a pipeline through which our collections/arrays object passes.
+Java.util.stream package contains the classes for processing the sequence of elements.
+
+The elements passing through this pipeline, it undergoes mulitple operations like sorting, filtering etc. 
+
+It is used for bulk processing of data coz it can do parallel processing.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Streams can be created from different element sources e.g collections or arrays with the help of stream() and of() methods. Once created, the stream instance will 
+not modify the contents of the source, threfore allowing creation of multiple stream insatnces from a single instance.
+
+Stream<String> streamEmpty = Stream.empty();         --> Creation of an empty stream.
+We use the empty() method upon creation to avoid returning null for streams with no element:
+
+public Stream<String> streamOf(List<String> list) {
+    return list == null || list.isEmpty() ? Stream.empty() : list.stream();
+}
+
+String[] arr = new String[]{"a","b","c"};
+Stream<String> stream = Arrays.stream(arr);   
+
+1. Stream<String> stream2 = Arrays.stream(arr, 1, 3);   
+
+stream3 = Stream.of("x", "y", "z");  
+
+A stream() default method is added to the Collection interface and allows creating a Stream<T> using any collection as an element source:
+
+2. Stream<String> stream = list.stream();
+
+Stream.builder():
+When using Stream.Builder(), the desired type should be specified in the right part of the statement, otherwise the build() methos will create 
+an instance of Stream<Object>.
+
+3. Stream<String> streamBuilder =
+    Stream.<String>builder().add("a").add("b").add("c");
+
+    streamBuilder.build();
+
+4. Stream<Integer> stream = Stream.of(...1,2,3,4,5,6)         -->  Frm static method
+
+5. Stream.generate(Supplier<T>):
+The generate() method accepts a Supplier<T> for element generation. As the resulting stream is infinite, the developer should specify the desired size, 
+or the generate() method will work until it reaches the memory limit:
+
+Stream<String> streamGenerated =
+    Stream.generate(() -> "element").limit(10);          // sequence of ten strings with the value “element.”
+
+6. Stream.iterate():
+Another way of creating an infinite stream is by using the iterate() method:
+
+Stream<Integer> streamIterated = Stream.iterate(40, n -> n + 2).limit(20);
+
+First elem of resulting stream is the first param of iterate() i.e 40. The fn() n -> n + 2 will add 2 to 40 so  stream = 40, 42, 44, 46 ...
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+INTERMEDIATE OPERATIONS:
+
+1. filter(Predicate<T> predicate) - filters the elems 
+2. map(Function<T, R> mapper) - Used to map each elem
+3. flatMap(Function<T, Stream<R>> mapper) - To iterate over each elem and flatten it.
+
+4. distinct() - Removes duplicate elems.
+
+    int[] arr = new int[]{1,2,5,2,,3,7,5};
+    Stream<Integer> stream = Arrays.stream(arr).distinct();
+
+4. sorted() - sorts the elems 
+
+    int[] arr = new int[]{1,2,5,2,,3,7,5};
+    Stream<Integer> stream = Arrays.stream(arr).sorted();
+
+5. peek(Consmer<T> action) - Helps to see the intermediate result of the stream which is getting processed.
+
+    int[] arr = new int[]{1,2,5,2,3,7,5};
+
+    Stream<Integer> stream = Arrays.stream(arr)
+        .filter((Integer val) -> val > 2)
+        .peek((Integer val) -> System.out.println(val))      
+        .map((Integer val) -> val + 10);
+    
+    int[] arr2 = stream.toArray(size -> new int[size]);
+
+6. limit(long size) - stop/truncate the stream no longer than "size"
+
+    int[] arr = new int[]{1,2,5,2,3,7,5};
+    Stream<Integer> stream = Arrays.stream(arr).limit(5);
+
+7. skip(long n) - skip the first "n" elems from stream
+
+8. mapToInt(ToIntFunction<T> mapper) - to work with primitive "int" data type 
+
+    String[] arr = new String[]{"1","2","5","2","3","7","5"};
+    IntStream stream = Arrays.stream(arr).mapToInt((String val) -> Integer.parseInt(val));
+    int[] arr2 = stream.filter((int val) -> val > 2).toArray();
+
+9. mapToLong(ToLongFunction<T> mapper) - to work with long values;
+
+10. mapToDouble(ToDoubleFunction<T> mapper) - to work with double values;
+
+TERMINAL METHODS:
+
+1.forEach(consumer<T> action) - Perform action on each elem of stream, dont return any value
+
+2. toArray() - collect stream to an array. It will return Object[]
+    For int[]  --> stream.toArray((int size) -> new int[size]);
+
+3. reduce(BinaryOperator<T> accumulator) - reduction/associative aggregation on elems
+
+4. collect(Collector<T> collector) - to collect the elems frm stream to a Collection(List, Map etc)
+
+5. min(Comparator<T> comparator), max(Comparator<T> comparator) - To find min/max
+
+6. count() - count the number of elems in the stream
+
+7. anyMatch(Predicate<T> predicate) - of any elem matches(0 or more) matches. allMatch(Pred..), noneMatch(Pred..)
+
+8. FndFirst() - find the 1st elem frm stream,           9.findAny() - finds any random elem from stream
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+STREAM OF PRIMITIVES:
+
+We can create streams of 3 primitive types: int, long, double. As Stream<T> is a generic interface, there is no way to use primitive types with generics.
+Therefore 3 new special interfaces were created: IntStream, LongStream, DoubleStream.
+
+Using the new interfaces alleviates unnecessary auto-boxing, which allows for increased productivity:
+
+IntStream intStream = IntStream.range(1, 3);
+LongStream longStream = LongStream.rangeClosed(1, 3);
+
+The range(int startInclusive, int endExclusive) method creates an ordered stream from the 1st parameter to the 2nd parameter(exclusive) i.e 1, 2
+
+rangeClosed(int startInclusive, int endInclusive) method does the same thing with only one difference, the 2nd element is included i.e 1,2,3
+
+Random class provides a wide range of methods for generating streams of primitives:
+
+Random random = new Random();
+DoubleStream doubleStream = random.doubles(3);    // creates a DoubleStream which has three elements.
+
+STREAM OF STRING:
+We can also use String as a source for creating a stream with the help of the chars() method of the String class. Since there is no interface for CharStream 
+in JDK, we use the IntStream to represent a stream of chars instead.
+
+IntStream streamOfChars = "abc".chars();
+
+Stream<String> streamOfString =
+  Pattern.compile(", ").splitAsStream("a, b, c");          //  Breaks a String into sub-strings according to specified RegEx
+
+STREAM OF FILE:
+
+Java NIO class Files allows us to generate a Stream<String> of a text file through the lines() method. Every line of the text 
+becomes an element of the stream:
+
+Path path = Paths.get("C:\\file.txt");
+Stream<String> streamOfStrings = Files.lines(path);
+Stream<String> streamWithCharset = Files.lines(path, Charset.forName("UTF-8"));
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+REFERENCING A STREAM:
+
+We can instantiate a stream, and have an accessible reference to it, as long as only intermediate operations are called. Executing a terminal 
+operation makes a stream inaccessible.
+
+Stream<String> stream = 
+  Stream.of("a", "b", "c").filter(element -> element.contains("b"));    --> Intermediate operation. "stream" var can be accessed later.
+
+Optional<String> anyElement = stream.findAny();     --> Terminal operation is operated on "stream". "stream" reference is lost now.
+Any attempt to use "stream" var will throw IllegalStateException. IllegalStateException is a RuntimeException, a compiler will not signalize about a problem.
+
+This is because the Stream is designed to apply finite sequence of operations on the source elements and not to store them.
+
+STREAM PIPELINE:
+To perform a sequence of operations over the elements of the data source and aggregate their results, we need three parts: the source, intermediate operation(s) 
+and a terminal operation. Intermediate operations return a new modified stream. We can only use one terminal operation per stream.
+
+Stream<String> onceModifiedStream =
+  Stream.of("abcd", "bbcd", "cbcd").skip(1);    // create new stream of existing one by skipping some elems.
+
+If we want subset of remaining elems in Stream, we can do this my chaining skip() and map().
+
+Stream<String> twiceModifiedStream =
+  stream.skip(1).map(element -> element.substring(0, 3));    // skip() + map()
+
+The correct and most convenient way to use streams is by a stream pipeline, which is a chain of the stream source, intermediate operations, & a terminal operation
+
+List<String> list = Arrays.asList("abc1", "abc2", "abc3");
+long size = list.stream().skip(1)
+  .map(element -> element.substring(0, 3)).sorted().count();
+
+LAZY INVOCATION:
+
+Intermediate operations are lazy. This means that they will be invoked only if it is necessary for the terminal operation execution.
+
+EX:
+private void wasCalled() {      --> counter is incremented every time wasCalled() is called.
+    counter++;
+}
+
+counter = 0;
+List<String> list = Arrays.asList(“abc1”, “abc2”, “abc3”);
+
+Stream<String> stream = list.stream().filter(element -> {
+    wasCalled();
+    return element.contains("2");
+});
+
+There is no terminal operation so the "filter()" method wont be invoked once. So the counter value = 0.
+
+If we add a terminal method "findFirst()" & a intermediate operation "map()":
+
+Optional<String> stream = list.stream().filter(element -> {
+    log.info("filter() was called");
+    return element.contains("2");
+}).map(element -> {
+    log.info("map() was called");
+    return element.toUpperCase();
+}).findFirst();
+
+The log will show that the "filter()" method was called twice & "map()" was called once. In the List (“abc1”, “abc2”, “abc3”). The 1st elem doesn’t contain
+"2", so it didnt satisfy the filter() method's condition. The 2nd elem has "2", it satisfy the filter() and invokes map(). Then The "findFirst()" will
+be invoked. As we got the first elem containing "2", we dont need to check for elems any more. So the filter() methods wont be called for 3rd elem.
+
+The Intermediate method wont be called if the Terminal method dont need it.
+
+List<Integer> list = Arrays.asList(2,1,4,3,5,6,7);
+Stream<Integer> stream = list.stream()
+                                .filter((Integer val) -> val > 2)
+                                .peek((Integer val) -> System.out.println(val));
+
+The above code will print nothing. As there is no terminal operation, it is not necessary to invoke the intermediate methods. 
+
+stream.count();
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ORDER OF EXECUTION:
+
+From the performance point of view, the right order is one of the most important aspects of chaining operations in the stream pipeline:
+long size = list.stream().map(element -> {
+    wasCalled();
+    return element.substring(0, 3);
+}).skip(2).count();
+
+The "map()" method will be called 3 times (coz 3 elems in the list). But as we used skip(2), it skips 2 elems so the resulting stream will contain only 
+one elem and the value of "size" var will be 1. We executed the "map()" method 3 times unnecessarily.
+
+If we change the order of execution of skip() & map(), the map() will be called once.
+
+long size = list.stream().skip(2).map(element -> {
+    wasCalled();
+    return element.substring(0, 3);
+}).count();
+
+NOTE: Intermediate operations which reduce the size of the stream should be placed before operations which are applying to each element. So we need to keep methods 
+such as skip(), filter(), and distinct() at the top of our stream pipeline.
+
+List<Integer> list = Arrays.asList(2,1,4,3,5,6,7);
+Stream<Integer> stream = list.stream()
+                                .filter((Integer val) -> val > 3)
+                                .peek((Integer val) -> System.out.println("After filter: " + val))   
+                                .map((Integer val) -> val * -1)
+                                .peek((Integer val) -> System.out.println("After map: " + val))
+                                .sorted()
+                                .peek((Integer val) -> System.out.println("After sort: " + val));
+
+First all the intermediate methods will run one by one (filter & peek), 1st elem = filter > peek > map > peek, 2nd elem = filter > peek > map > peek, 3rd ...
+At last terminal method will run and sorts all the numbers. And then again the last peek method runs;
+
+Output: After filter: 4
+        After map: -4
+        After filter: 5
+        After map: -5
+        ...
+        After sort: 4
+        After sort: 5
+        After sort: 6
+        .....
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+STREAM OPERATIONS:
+
+After the creation of a stream, there are be many operations performed on the stream. These operations are categorized into "Intermediate" & "Terminal".
+
+Intermediate operations return a Stream<T> so the more operations can be performed in the stream later. It allows chaining.
+Terminal operations return the result as a definite type(array, list, object etc);
+
+long count = list.stream().distinct().count();
+
+distinct() ->  intermediate operation, which creates a new stream of unique elements of the previous stream. count() ->  terminal operation
+
+* ITERATING:
+
+Stream API helps to substitute for, for-each, and while loops. It allows concentrating on operation’s logic, but not on the iteration over the sequence of elements. 
+
+for (String string : list) 
+    if (string.contains("a"))  return true;
+
+The above can be converted into:
+boolean isExist = list.stream().anyMatch(element -> element.contains("a"));
+
+* FILTERING:
+
+The filter() method allows us to pick a stream of elements that satisfy a condition.
+
+ArrayList<String> list = new ArrayList<>();
+
+list.add("One");
+list.add("OneAndOnly");
+list.add("Derek");
+list.add("factory");
+
+Stream<String> stream = list.stream().filter(element -> element.contains("d"));
+
+The above code creates a Stream<String>, finds all elems containing "d" & creates a new stream of elems containing the filtered elems.
+
+* MAPPING:
+
+To convert elements of a Stream by applying a special function to them and to collect these new elements into a Stream, we can use the map() method:
+
+List<String> uris = new ArrayList<>();
+uris.add("www.google.in");
+
+Stream<Path> stream = uris.stream().map(uri -> Paths.get(uri));
+
+The code above converts Stream<String> to the Stream<Path> by applying a specific lambda expression to every element of the initial Stream.
+
+If you have a stream of elems where every elem has its own sequence of elems(nested sequence), you can convert those nested sequence into stream:
+
+List<Detail> details = new ArrayList<>();
+details.add(new Detail());
+
+Stream<String> stream = details.stream().flatMap(detail -> detail.getParts().stream());
+
+We have a list of elements of type "Detail". The Detail class contains a field "PARTS", which is a List<String>.  With the help of the flatMap() method, every 
+element from field PARTS will be extracted and added to the new resulting stream. After that, the initial Stream<Detail> will be lost.
+
+* MATCHING:
+
+Stream API gives a handy set of instruments to validate elements of a sequence according to some predicate. To do this, one of the following methods can be used: 
+anyMatch(), allMatch(), noneMatch(). These are all Terminal operations.
+
+boolean isValid = list.stream().anyMatch(element -> element.contains("h"));         // if any elem contains "h"
+boolean isValidOne = list.stream().allMatch(element -> element.contains("h"));      // if all elem contains "h"
+boolean isValidTwo = list.stream().noneMatch(element -> element.contains("h"));     // if no elem contains "h"
+
+For empty streams, the allMatch() method with any given condition will return true:
+
+Stream.empty().allMatch(Objects::nonNull);     // true
+
+This is a sensible default, as we can’t find any element that doesn’t satisfy the predicate.
+
+Similarly, the anyMatch() method always returns false for empty streams:
+
+Stream.empty().anyMatch(Objects::nonNull); // false
+
+* REDUCTION:
+Stream API has many terminal operations to aggregate a stream to a primitive or type: count(), max(), min(), sum(). These are pre-defined but if a dev wants to 
+implement his own reduction/aggregation mechanism, he can use "reduce()" & "collect()"
+
+The "reduce()" method has 3 variations of this method, which differ by their signatures and returning types. Parameters:
+
+identity – the initial value for an accumulator, or a default value if a stream is empty and there is nothing to accumulate
+
+accumulator – a function which specifies the logic of the aggregation of elements. It runs for each elem in the stream and creates a new aggregated elem.
+We dont want the new elems as the no. of new values == no of elems in the original collection/array. That means it has TC: O(N). So it has bad performance.
+
+combiner – a function which aggregates the results of the accumulator. We only call combiner in a parallel mode to reduce the results of accumulators from 
+different threads.
+
+OptionalInt reduced = IntStream.range(1, 4).reduce((a, b) -> a + b);    // reduced = 6 (0 + 1 + 2 + 3)
+
+int reducedTwoParams = IntStream.range(1, 4).reduce(10, (a, b) -> a + b);   // reducedTwoParams = 16 (10 + 1 + 2 + 3)
+
+int reducedParams = Stream.of(1, 2, 3)      // 16 (10 + 1 + 2 + 3). combiner wasnt called. To make a combiner work, a stream should be parallel
+  .reduce(10, (a, b) -> a + b, (a, b) -> {
+     log.info("combiner was called");
+     return a + b;
+  });
+
+int reducedParallel = Arrays.asList(1, 2, 3).parallelStream()
+    .reduce(10, (a, b) -> a + b, (a, b) -> {
+       log.info("combiner was called");
+       return a + b;
+    });
+
+Here the reduction works by the following algorithm: the accumulator ran three times by adding every element of the stream to identity. These actions are 
+being done in parallel. As a result, they have (10 + 1 = 11; 10 + 2 = 12; 10 + 3 = 13;). Now combiner can merge these three results. It needs two iterations 
+for that (12 + 13 = 25; 25 + 11 = 36).
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+COLLECTING:
+
+The reduction can also be provided by the collect() method of type Stream. This operation is very handy in case of converting a stream to a Collection or a Map 
+and representing a stream in the form of a single string. There is a utility class Collectors which provide a solution for almost all typical collecting operations. 
+For some, not trivial tasks, a custom Collector can be created.
+
+List<String> resultList = list.stream().map(element -> element.toUpperCase()).collect(Collectors.toList());
+
+String listToString = productList.stream().map(Product::getName)    // Product::getName  == prod -> prod.getName()
+  .collect(Collectors.joining(", ", "[", "]"));
+
+The joiner() method can have from one to three parameters (delimiter, prefix, suffix). The most convenient thing about using joiner() is that the developer doesn’t 
+need to check if the stream reaches its end to apply the suffix and not to apply a delimiter. Collector will take care of that.
+
+double averagePrice = productList.stream()                   // avg of all elems
+  .collect(Collectors.averagingInt(Product::getPrice));
+
+int summingPrice = productList.stream()                         // sum of all elems
+  .collect(Collectors.summingInt(Product::getPrice));
+
+The methods averagingXX(), summingXX() and summarizingXX() can work with primitives (int, long, double) and with their wrapper classes (Integer, Long, Double). 
+One more powerful feature of these methods is providing the mapping. As a result, the developer doesn’t need to use an additional map() operation before the 
+collect() method.
+
+We can find the sum, count, min, max, avg through one statement.
+
+IntSummaryStatistics statistics = productList.stream()           --> statistics.toString() will return string with all the values(ie sum, min, avg etc) 
+  .collect(Collectors.summarizingInt(Product::getPrice));
+
+Map<Integer, List<Product>> collectorMapOfLists = productList.stream()        // group all the products by their price
+  .collect(Collectors.groupingBy(Product::getPrice));
+
+Map<Boolean, List<Product>> mapPartioned = productList.stream()              // group according to some condition
+  .collect(Collectors.partitioningBy(element -> element.getPrice() > 15));
+
+
+CUSTOM COLLECTOR:
+
+Collector<Product, ?, LinkedList<Product>> toLinkedList =
+  Collector.of(LinkedList::new, LinkedList::add, 
+    (first, second) -> { 
+       first.addAll(second); 
+       return first; 
+    });
+
+LinkedList<Product> linkedListOfPersons = productList.stream().collect(toLinkedList);
+In this example, an instance of the Collector got reduced to the LinkedList<Person>.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+PARALLEL STREAMS:
+
+Stream API simplifies multi threading by providing parallelStream() method that runs operations over the streams elements in parallel.
+parallelStream is faster than sequential stream.
+
+list.parallelStream().forEach(elem -> doSomething(elem));
+
+The API allows us to create parallel streams, which perform operations in a parallel mode. When the source of a stream is a Collection or 
+an array, it can be achieved with the help of the parallelStream() method:
+
+Stream<Product> streamOfCollection = productList.parallelStream();
+
+boolean isParallel = streamOfCollection.isParallel();       // true;
+
+boolean bigPrice = streamOfCollection
+  .map(product -> product.getPrice() * 12)
+  .anyMatch(price -> price > 200);               // returns true if price of any product > 200
+
+Stream API automatically uses the ForkJoin framework to execute operations in parallel. By default, the common thread pool will be used and there is no way
+(at least for now) to assign some custom thread pool to it. This can be overcome by using a custom set of parallel collectors.
+
+ParallelStream will pass the data to SplitIterator. SplitIterator will recursively break the data(collection) into smaller(half) stream and again give
+that to SplitIterator. The smaller chunks are worked using ForkJoin pool technique.
+
+When using streams in parallel mode, avoid blocking operations. It is also best to use parallel mode when tasks need a similar amount of time to execute. 
+If one task lasts much longer than the other, it can slow down the complete app’s workflow.
+
+The stream in parallel mode can be converted back to the sequential mode by using the sequential() method:
+
+IntStream intStreamSequential = intStreamParallel.sequential();
+boolean isParallel = intStreamSequential.isParallel();          // false
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Using Stream.findAny():
+
+findAny() method allows us to find any element from a Stream. We use it when we’re looking for an element without paying an attention to the 
+encounter order. The method returns an Optional instance, which is empty if the Stream is empty.
+
+In a non-parallel operation, it will most likely return the first element in the Stream, but there is no guarantee for this.
+
+@Test
+public void createStream_whenFindAnyResultIsPresent_thenCorrect() {
+    List<String> list = Arrays.asList("A","B","C","D");
+
+    Optional<String> result = list.stream().findAny();
+
+    assertTrue(result.isPresent());
+    assertThat(result.get(), anyOf(is("A"), is("B"), is("C"), is("D")));
+}
+
+Using Stream.findFirst()
+
+The findFirst() method finds the first element in a Stream. When there is no encounter order, it returns any element from the Stream. 
+The return type is also an Optional instance, which is empty if the Stream is empty too:
+
+@Test
+public void createStream_whenFindFirstResultIsPresent_thenCorrect() {
+
+    List<String> list = Arrays.asList("A", "B", "C", "D");
+
+    Optional<String> result = list.stream().findFirst();
+
+    assertTrue(result.isPresent());
+    assertThat(result.get(), is("A"));
+}
+
+The behavior of the findFirst method does not change in the parallel scenario. If the encounter order exists, it will always behave deterministically.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+      List<Integer> list = Arrays.asList(1,3,6,3,8,2,7,9);
+	    List<Integer> list1 = Arrays.asList(3,8,2,7);
+	    
+	    long sum = list.stream()
+	            .filter(num -> num%2 == 0)
+	            .count();
+	            
+	   List<Integer> res = list.stream()
+	        .filter(num -> num % 2 == 0)
+	        .map(num -> num * 2)
+	        .collect(Collectors.toList());
+	        
+	    int max = list.stream()
+	            .mapToInt(i -> i)
+	            .max().getAsInt();
+	            
+	   List<String> fruits = Arrays.asList("Apple", "Mango", "banana", "Apple");
+	            
+	   String s = fruits.stream()
+	                .map(str -> str.toUpperCase() + " ")
+	                .collect(Collectors.joining());
+	                
+	   double avg = list.stream()
+	                .mapToDouble(i -> i)
+	                .average().getAsDouble();
+	                
+	   Set<String> fruits1 = fruits.stream()
+	                            .distinct()
+	                            .map(str -> str.toUpperCase())
+	                            .collect(Collectors.toSet());
+	                            
+	   boolean allEven = list.stream()
+	                        .anyMatch(num -> num % 2 == 0);
+	                        
+	   int len = fruits.stream()
+	                   .mapToInt(String::length)
+	                   .max()
+	                   .getAsInt();
+	                   
+	   List<Person> people = Arrays.asList(
+                new Person("Alice", "HR", 2),
+                new Person("Anna", "HR", 20),
+                new Person("Bob", " HR", 30),
+                new Person("Barbie", "Sales", 56),
+                new Person("Charlie", "Sales", 40)  
+        );
+        
+       people.stream()
+              .sorted(Comparator.comparing(p -> p.salary))
+              .collect(Collectors.toList())
+              .forEach(p -> System.out.println(p.name + " - " + p.salary));
+	            
+		
+		int secondSmallest = list.stream()
+		                         .distinct()
+		                         .sorted()
+		                         .skip(1)
+		                         .findFirst()
+		                         .get();
+		                         
+		List<Integer> ans = list.stream()
+		                        .filter(i -> list1.contains(i))
+		                        .collect(Collectors.toList());

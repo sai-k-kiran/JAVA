@@ -1,0 +1,437 @@
+LIFECYCLE OF A THREAD:
+
+1. NEW:
+A NEW Thread is a thread that’s been created but not yet started. It remains in this state until we start it using the start() method.
+
+Runnable runnable = new NewState();
+Thread t = new Thread(runnable);
+System.out.println(t.getState());         // New 
+
+2. Runnable:
+When we’ve created a new thread and called the start() method on that, it’s moved from NEW to RUNNABLE state. Threads in this state are either running or 
+ready to run, but they’re waiting for resource allocation from the system. In a multi-threaded environment, the Thread-Scheduler (which is part of JVM) 
+allocates a fixed amount of time to each thread. So it runs for a particular amount of time, then relinquishes the control to other RUNNABLE threads.
+
+Runnable runnable = new NewState();
+Thread t = new Thread(runnable);
+t.start();
+System.out.println(t.getState());     //  RUNNABLE
+
+3. BLOCKED:
+A thread is in BLOCKED state when it is ineligible to run. It enters this state when it is waiting for a monitor lock and is trying to access a section code 
+that is locked by some other thread.
+
+public class BlockedState {
+    public static void main(String[] args) throws InterruptedException {
+        Thread t1 = new Thread(new DemoBlockedRunnable());
+        Thread t2 = new Thread(new DemoBlockedRunnable());
+        
+        t1.start();
+        t2.start();
+        
+        Thread.sleep(1000);     // main thread is sleeping for 1 sec
+        
+        System.out.println(t2.getState());   // BLOCKED, coz t1 has the monitor and is doing is some heavy processing
+        System.exit(0); 
+    }
+}
+
+class DemoBlockedRunnable implements Runnable {
+    @Override
+    public void run() {
+        commonResource();
+    }
+    
+    public static synchronized void commonResource() {
+        while(true) {
+            // Infinite loop to mimic heavy processing. 't1' won't leave this method
+        }
+    }
+}
+
+As thread "t1" wont leave the commonResource() method hence not releasing the lock it has on commonResource(), so "t2" will wait for "t1" to release its lock
+and "t2" will be in BLOCKED state till then.
+
+4. WAITING:
+A thread is in WAITING state when it’s waiting for some other thread to perform a particular action. A thread can enter this state by calling:
+
+    1. object.wait()
+    2. thread.join() or
+    3. LockSupport.park()
+
+public class WaitingState implements Runnable {
+    public static Thread t1;
+
+    public static void main(String[] args) {
+        t1 = new Thread(new WaitingState());
+        t1.start();
+    }
+
+    public void run() {
+        Thread t2 = new Thread(new DemoWaitingStateRunnable());
+        t2.start();
+
+        try {
+            t2.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            e.printStackTrace();
+        }
+    }
+}
+
+class DemoWaitingStateRunnable implements Runnable {
+    public void run() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            e.printStackTrace();
+        }
+    }
+}
+
+5. TIMED WAITING:
+A thread is in TIMED_WAITING state when it’s waiting for another thread to perform a particular action within a stipulated amount of time.
+There are five ways to put a thread on TIMED_WAITING state:
+
+    1. Thread.sleep(long millis)
+    2. wait(int timeout) or wait(int timeout, int nanos)
+    3. thread.join(long millis)
+    4. LockSupport.parkNanos
+    5. LockSupport.parkUntil
+
+public class TimedWaitingState {
+    public static void main(String[] args) throws InterruptedException {
+        DemoTimeWaitingRunnable runnable= new DemoTimeWaitingRunnable();
+        Thread t1 = new Thread(runnable);
+        t1.start();
+        
+        Thread.sleep(1000);   // The following sleep will give enough time for ThreadScheduler to start processing of thread t1
+        System.out.println(t1.getState());    // TIMED_WAITING
+    }
+}
+
+class DemoTimeWaitingRunnable implements Runnable {
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            e.printStackTrace();
+        }
+    }
+}
+
+6. TERMINATED
+This is the state of a dead thread. It’s in the TERMINATED state when it has either finished execution or was terminated abnormally.
+
+public class TerminatedState implements Runnable {
+    public static void main(String[] args) throws InterruptedException {
+        Thread t1 = new Thread(new TerminatedState());
+        t1.start();
+        
+        Thread.sleep(1000);   // The following sleep method will give enough time for thread t1 to complete
+        System.out.println(t1.getState());     // TERMINATED
+    }
+    
+    @Override
+    public void run() {
+        // No processing in this block
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+THREAD POOLS:
+
+In Java, threads are mapped to system-level threads, which are the operating system’s resources. If we create threads uncontrollably, we may run out 
+of these resources quickly.
+
+The operating system does the context switching between threads as well — in order to emulate parallelism. A simplistic view is that the more threads we 
+spawn, the less time each thread spends doing actual work. The Thread Pool pattern helps to save resources in a multithreaded application and to contain 
+the parallelism in certain predefined limits.
+
+When we use a thread pool, we write our concurrent code in the form of parallel tasks and submit them for execution to an instance of a thread pool. 
+This instance controls several re-used threads for executing these tasks. The pattern allows us to control the number of threads the application creates 
+and their life cycle. We’re also able to schedule tasks’ execution and keep incoming tasks in a queue.
+
+* Thread Pools in java:
+Executors, Executor and ExecutorService:
+
+The "Executors" helper class contains several methods for the creation of preconfigured thread pool instances.  We can use them if we don’t need to apply 
+any custom fine-tuning. 
+
+We use the "Executor" and "ExecutorService" interfaces to work with different thread pool implementations in Java. Usually, we should keep our code decoupled 
+from the actual implementation of the thread pool and use these interfaces throughout our application.
+
+- Executor:
+The Executor interface has a single execute method to submit Runnable instances for execution.
+
+Executor executor = Executors.newSingleThreadExecutor();    // Executor instance backed by a single thread pool and an unbounded queue for executing tasks sequentially
+executor.execute(() -> System.out.println("Hello World"));  // task submitted as a lambda, which is inferred to be Runnable
+
+- ExecutorService:
+The ExecutorService interface contains a large number of methods to control the progress of the tasks and manage the termination of the service. Using this 
+interface, we can submit the tasks for execution and also control their execution using the returned Future instance.
+
+ExecutorService executorService = Executors.newFixedThreadPool(10);
+Future<String> future = executorService.submit(() -> "Hello World");
+        // some operations
+String result = future.get();
+
+Here, we overload the submit method to take either Runnable or Callable.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+ThreadPoolExecutor:
+The ThreadPoolExecutor is an extensible thread pool implementation with lots of parameters and hooks for fine-tuning.
+The corePoolSize parameter is the number of "core threads" that will be instantiated and kept in the pool. If a new task comes and all the threads in the 
+pool are busy and the internal queue is full, then the pool size is allowed to grow upto "maximumPoolSize".
+
+The excessive threads (which are not "core threads") will be allowed to remain alive in idle state till "keepAliveTime" param. By default, the ThreadPoolExecutor 
+only considers non-core threads for removal. In order to apply the same removal policy to core threads, we can use the allowCoreThreadTimeOut(true) method.
+
+- newFixedThreadPool (Executors static method):
+newFixedThreadPool method creates a ThreadPoolExecutor with corePoolSize == maximumPoolSize parameter values and a zero keepAliveTime. This means that 
+the number of threads in this thread pool is always the same
+
+ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(2);
+executor.submit(() -> {
+    Thread.sleep(1000);
+    return null;
+});
+executor.submit(() -> {
+    Thread.sleep(1000);
+    return null;
+});
+executor.submit(() -> {
+    Thread.sleep(1000);
+    return null;
+});
+
+assertEquals(2, executor.getPoolSize());    // true, 2 tasks are executing
+assertEquals(1, executor.getQueue().size());  // true, 1 task is waiting in queue.
+
+If the no. of simultaneously running tasks <= 2 then they executed right away. If more, then the extra tasks are put into a queue to wait for their turn.
+
+- newCachedThreadPool() 
+This method doesnt receive a no. of threads. corePoolSize = 0 & maximumPoolSize = Integer.MAX_VALUE & keepAliveTime = 60 sec.
+
+This parameter mean that the cached thread pool may grow without bounds to accommodate any number of submitted tasks. But when the threads are not needed 
+anymore, they will be disposed of after 60 seconds of inactivity. A typical use case is when we have a lot of short-living tasks in our application.
+
+The queue size = 0 always because it uses a SynchronousQueue instance. In a SynchronousQueue, pairs of insert and remove operations always occur simultaneously. 
+So, the queue never actually contains anything.
+
+- newSingleThreadExecutor():
+This API creates a new ThreadPoolExecutor containing a single thread. This is ideal for creating an event loop.
+corePoolSize = 1, maximumPoolSize = 1, keepAliveTime = 0
+
+AtomicInteger counter = new AtomicInteger();
+
+ExecutorService executor = Executors.newSingleThreadExecutor();
+executor.submit(() -> {
+    counter.set(1);
+});
+executor.submit(() -> {
+    counter.compareAndSet(1, 2);
+});
+
+This ThreadPoolExecutor is decorated with an immutable wrapper, so it can’t be reconfigured after creation. This is also the reason we can’t cast it to 
+a ThreadPoolExecutor.
+
+In Spring "ThreadPoolTaskExecutor" is a JavaBean that provides an abstraction around a "java.util.concurrent.ThreadPoolExecutor" instance and exposes it as a 
+Spring "org.springframework.core.task.TaskExecutor".
+
+The corePoolSize is the minimum number of workers to keep alive without timing out.  It is a configurable property of ThreadPoolTaskExecutor and delegates 
+setting this value to the "ThreadPoolExecutor" abstraction. "allowCoreThreadTimeOut" = true sets the corePoolSize = 0, means all threads may time out.
+
+maxPoolSize defines the maximum number of threads that can ever be created. It too delegates the setting this value to "ThreadPoolExecutor". maxPoolSize depends 
+on queueCapacity, ThreadPoolTaskExecutor will only create a new thread if the number of items in its queue exceeds queueCapacity.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* ScheduledThreadPoolExecutor
+
+The ScheduledThreadPoolExecutor extends the ThreadPoolExecutor class and implements the ScheduledExecutorService interface with several additional methods:
+
+    - schedule() method allows us to run a task once after a specified delay.
+    - scheduleAtFixedRate() method allows us to run a task after a specified initial delay and then run it repeatedly with a certain period. The period 
+        argument is the time measured between the starting times of the tasks, so the execution rate is fixed.
+    - scheduleWithFixedDelay() method is similar to scheduleAtFixedRate in that it repeatedly runs the given task, but the specified delay is measured between 
+        the end of the previous task and the start of the next. The execution rate may vary depending on the time it takes to run any given task.
+
+We typically use the Executors.newScheduledThreadPool() method to create a ScheduledThreadPoolExecutor with a given corePoolSize, unbounded maximumPoolSize and 
+zero keepAliveTime.
+
+ScheduledExecutorService executor = Executors.newScheduledThreadPool(5);
+executor.schedule(() -> {
+    System.out.println("Hello World");
+}, 500, TimeUnit.MILLISECONDS);   
+
+Above code shows how to schedule a task for execution in 500 milliseconds
+
+CountDownLatch lock = new CountDownLatch(3);
+
+ScheduledExecutorService executor = Executors.newScheduledThreadPool(5);
+
+ScheduledFuture<?> future = executor.scheduleAtFixedRate(() -> {
+    System.out.println("Hello World");
+    lock.countDown();
+}, 500, 100, TimeUnit.MILLISECONDS);
+
+lock.await(1000, TimeUnit.MILLISECONDS);
+future.cancel(true);
+
+Run the task with initialDelay of 500 ms and repeat every 100 ms. When countDown reaches 0 by firing "lock.countDown()", then we cancel it using future.cancel()
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+HOW TO KILL A JAVA THREAD:
+
+1. Using a flag:
+
+public class ControlSubThread implements Runnable {
+
+    private Thread worker;
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private int interval;
+
+    public ControlSubThread(int sleepInterval) {
+        interval = sleepInterval;
+    }
+ 
+    public void start() {
+        worker = new Thread(this);
+        worker.start();
+    }
+ 
+    public void stop() {
+        running.set(false);
+    }
+
+    public void run() { 
+        running.set(true);
+        while (running.get()) {
+            try { 
+                Thread.sleep(interval); 
+            } catch (InterruptedException e){ 
+                Thread.currentThread().interrupt();
+                System.out.println("Thread was interrupted, Failed to complete operation");
+            }
+         } 
+    } 
+}
+
+Using an AtomicBoolean prevents conflicts in setting and checking the variable from different threads.
+
+2. Interrupting a thread:
+
+public void interrupt() {
+    running.set(false);
+    worker.interrupt();
+}
+
+Add this interrupt() method in above class. This method sets thr running flag to false and calls the interrupt() method of worker thread. 
+If the thread is sleeping when this is called, sleep() will exit with an InterruptedException, this returns the thread to the loop, and it 
+will exit since running is false.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Implementing a Runnable vs Extending a Thread:
+
+Using Thread:
+
+public class SimpleThread extends Thread {
+
+    private String message;
+
+    public SimpleThread(String mssg){
+        this.message = mssg;
+    }
+
+    @Override
+    public void run() {
+        log.info(message);
+    }
+}
+
+@Test
+public void givenAThread_whenRunIt_thenResult() throws Exception {
+ 
+    Thread thread = new SimpleThread("SimpleThread executed using Thread");
+    thread.start();
+    thread.join();
+}
+
+We can also use an ExecutorService to execute the thread:
+
+@Test
+public void givenAThread_whenSubmitToES_thenResult() throws Exception {
+    
+    executorService.submit(new SimpleThread("SimpleThread executed using ExecutorService")).get();
+}
+
+SimpleThread cannot extend any other class, as Java doesn’t support multiple inheritance.
+
+Implementing Runnable:
+
+Create same SimpleThread class which implements Runnable interface.
+
+@Test
+public void givenRunnable_whenRunIt_thenResult() throws Exception {
+    Thread thread = new Thread(new SimpleRunnable("SimpleRunnable executed using Thread"));
+
+    thread.start();
+    thread.join();
+}
+
+@Test
+public void givenARunnable_whenSubmitToES_thenResult() throws Exception {
+    
+    executorService.submit(() -> log.info("Lambda runnable executed!"));
+}   // instead of lambda, we could write the above code same as "Using Thread"s executorService.submit method.
+
+Simply put, we generally encourage the use of Runnable over Thread:
+
+    - When extending the Thread class, we’re not overriding any of its methods. Instead, we override the method of Runnable (which Thread happens to implement). 
+        This is a clear violation of IS-A Thread principle
+    - Creating an implementation of Runnable and passing it to the Thread class utilizes composition and not inheritance – which is more flexible
+    - After extending the Thread class, we can’t extend any other class
+    - From Java 8 onwards, Runnables can be represented as lambda expressions
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+THREAD SYNCHRONIZATION IN JAVA:
+
+In a multithreaded env, multiple threads might try to modify the same resource. Not managing threads properly will of course lead to consistency issues.
+
+One tool we can use to coordinate actions of multiple threads in Java is guarded blocks. Such blocks keep a check for a particular condition before 
+resuming the execution.
+
+    - Object.wait()    -->   to suspend a thread
+    - Object.notify()  -->   to wake a thread up
+
+- wait() method:
+Calling wait() forces the current thread to wait until some other thread invokes notify() or notifyAll() on the same object. It has 3 overloaded signatures.
+For this, the current thread must own the object’s monitor. This can happen in the following ways:
+
+    - when we’ve executed synchronized object method for the given object
+    - when we’ve executed the body of a synchronized block on the given object
+    - by executing synchronized static methods for objects of type Class.
+
+wait() - The wait() method causes the current thread to wait indefinitely until another thread either invokes notify() for this object or notifyAll().
+
+wait(long timeout) - we can specify a timeout after which a thread will be woken up automatically. A thread can be woken up before reaching the timeout 
+using notify() or notifyAll().
+
+wait(long timeout, int nanos) - This is another signature providing the same functionality. The only difference is that it has higher precision.
+The total timeout period (in nanoseconds) is calculated as 1_000_000*timeout + nanos.
+
+- notify() method:
+For all threads waiting on this object’s monitor (by using any one of the wait() methods), the method notify() notifies any one of them to wake up arbitrarily. 
+The choice of exactly which thread to wake is nondeterministic and depends upon the implementation.
+
+Since notify() wakes up a single random thread, we can use it to implement mutually exclusive locking where threads are doing similar tasks. But in most 
+cases, it would be more viable to implement notifyAll().
+
+- notifyAll() method:
+This method simply wakes all threads that are waiting on this object’s monitor. But before we allow their execution to continue, always define a quick check for the 
+condition required to proceed with the thread. This is because there may be some situations where the thread got woken up without receiving a notification

@@ -1,0 +1,121 @@
+Loading Initial Data with Spring Boot:
+
+If we want to create database tables amd insert data into tables using sql scripts (schema.sql, data,sql), We can do that by creating .sql files with required
+sql statements. Create sql files in src/main/resources
+
+For hibernate to first create the tables before loading the data into them, we need to defer the initialization of data sources:
+
+    spring.jpa.defer-datasource-initialization=true  --> Use this property in application.properties file.
+
+By default, data.sql scripts run before initialization of hibernate, so we need to put this property.
+
+And for any script based initialization, i.e. inserting data via data.sql or creating schema via schema.sql, we need to set the below property:
+
+    spring.sql.init.mode=always
+
+Please note that if we are using script-based initialization, i.e. through schema.sql and data.sql and also Hibernate initialization, then using both of them 
+together can cause some issues. 
+To solve this, we can disable the execution of DDL commands altogether by Hibernate, which Hibernate uses for the creation/updation of tables:
+    spring.jpa.hibernate.ddl-auto=none  --> hibernate will not create the tables from entities 
+
+If we still want to have both Hibernate automatic schema generation in conjugation with script-based schema creation and data population, we’ll have to use:
+    spring.jpa.defer-datasource-initialization=true
+
+This will ensure that after Hibernate schema creation is performed, then additionally schema.sql is read for any additional schema changes, and further data.sql is
+executed to populate the database. 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Controlling Database Creation Using Hibernate:
+
+Spring provides a JPA-specific property that Hibernate uses for DDL generation: 
+    spring.jpa.hibernate.ddl-auto.
+
+
+    > create : Hibernate first drops existing tables and then creates new tables.
+    > update : The object model created based on the mappings (annotations or XML) is compared with the existing schema, and then Hibernate updates the schema 
+    according to the diff. It never deletes the existing tables or columns even if they are no longer required by the application.
+
+    > create-drop : similar to create, with the addition that Hibernate will drop the database after all operations are completed; typically used for unit testing
+    > validate : Hibernate only validates whether the tables and columns exist; otherwise, it throws an exception.
+    > none : This value effectively turns off the DDL generation by hibernate.
+
+Spring Boot internally defaults this parameter value to create-drop if no schema manager has been detected, otherwise none for all other cases.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Customizing Database Schema Creation:
+
+By default, Spring Boot automatically creates the schema of an embedded DataSource.
+
+If we need to control or customize this behavior, we can use the property spring.sql.init.mode. This property takes one of three values:
+
+    > always : always initialize the database
+    > embedded : always initialize if an embedded database is in use. This is the default if the property value is not specified.
+    > never : never initialize the database
+
+Notably, if we are using a non-embedded database, let’s say MySQL or PostGreSQL, and want to initialize its schema, we’ll have to set this property to always.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+@Sql:
+
+Spring also provides the @Sql annotation — a declarative way to initialize and populate our "test" schema.
+The @Sql annotation can be used at the class level or the method level.
+
+@Sql({"/employees_schema.sql", "/import_employees.sql"})
+public class SpringBootInitialLoadIntegrationTest {
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @Test
+    public void testLoadDataForTestClass() {
+        assertEquals(3, employeeRepository.findAll().size());
+    }
+}
+
+Here are the attributes of the @Sql annotation:
+
+    > config : local configuration for the SQL scripts. We describe this in detail in the next section.
+    > executionPhase : We can also specify when to execute the scripts, either BEFORE_TEST_METHOD or AFTER_TEST_METHOD.
+    > statements : We can declare inline SQL statements to execute.
+    > scripts : We can declare the paths to SQL script files to execute. This is an alias for the value attribute.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+@SqlConfig :
+
+We can configure the way we parse and run the SQL scripts by using the @SqlConfig annotation.
+
+@SqlConfig can be declared at the class level, where it serves as a global configuration. Or we can use it to configure a particular @Sql annotation.
+
+@Test
+@Sql(scripts = {"/import_senior_employees.sql"}, 
+  config = @SqlConfig(encoding = "utf-8", transactionMode = TransactionMode.ISOLATED))
+public void testLoadDataForTestCase() {
+    assertEquals(5, employeeRepository.findAll().size());
+}
+
+And let’s look at the various attributes of @SqlConfig:
+
+    > blockCommentStartDelimiter : delimiter to identify the start of block comments in SQL script files
+
+    > blockCommentEndDelimiter : delimiter to denote the end of block comments in SQL script files
+
+    > commentPrefix : prefix to identify single-line comments in SQL script files
+
+    > dataSource : name of the javax.sql.DataSource bean against which the scripts and statements will be run
+
+    > encoding : encoding for the SQL script files; default is platform encoding
+
+    > errorMode : mode that will be used when an error is encountered running the scripts
+
+    > separator : string used to separate individual statements; default is “–“
+
+    > transactionManager : bean name of the PlatformTransactionManager that will be used for transactions
+
+    > transactionMode : the mode that will be used when executing scripts in transaction
+
+Java 8 and above allow the use of repeated annotations. We can utilize this feature for @Sql annotations as well. For Java 7 and below, there is a 
+container annotation : @SqlGroup.

@@ -1,0 +1,128 @@
+Differences Between Enumeration Vs Iterator In Java
+Enumeration and Iterator are two interfaces in java.util package which are used to traverse over the elements of a Collection object.  Using Enumeration, you can only 
+traverse the Collection object. But using Iterator, you can also remove an element while traversing the Collection. This is the one major difference between 
+Enumeration and Iterator in java. Iterator is somehwat an advanced version of Enumeration;
+
+                        Enumeration                                     |                     Iterator 
+        ------------------------------------------------------------------------------------------------------------
+1. Was introduced in JDk 1.0                                            |   Was introduced in JDk 1.2
+
+2. It doesn’t have a remove() method                                    |   It has a remove() method
+
+3. Only for traversing a collection, modification is not allowed        |   Traversing & modification is allowed
+
+4. Methods - hasNext(), next(), remove()                                |   Methods - 	hasMoreElements(), nextElement()
+
+5. It is a legacy interface used to traverse legacy clases such as      |  Iterator is not a legacy code. Used to traverse most of the classes in the collection 
+    Vector, HashTable, Stack                                            |  framework such as ArrayList, LinkedList, Hashset, HashMap, TreeMap, TreeSet etc.
+ 
+6. Fail-safe in nature. Doesn't throw any exception                     |   Fail-fast in nature. Throws ConcurrentModificationException if a collection is
+                                                                        |   modified while iterating
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Differences Between HashMap And HashTable In Java :
+
+1) Thread Safe
+
+    HashTable is internally synchronized. Therefore, it is very much safe to use HashTable in multi threaded applications. Where as HashMap is not internally 
+    synchronized. Therefore, it is not safe to use HashMap in multi threaded applications without external synchronization. You can externally synchronize HashMap 
+    using Collections.synchronizedMap() method.
+
+2) Inherited From
+
+    Though both HashMap and HashTable implement Map interface, but they extend two different classes. HashMap extends AbstractMap class where as 
+    HashTable extends Dictionary class which is the legacy class in java.
+
+3) Null Keys And Null Values
+
+    HashMap allows maximum one null key and any number of null values. Where as HashTable doesn’t allow even a single null key and null value.
+
+4) Traversal
+
+    HashMap returns only Iterators which are used to traverse over the elements of HashMap. HashTable returns Iterator as well as Enumeration.
+
+5) Fail-Fast Vs Fail-Safe
+
+    Iterator returned by HashMap are fail-fast in nature i.e they throw ConcurrentModificationException if the HashMap is modified after the creation of Iterator other 
+    than iterator’s own remove() method. On the other hand, Enumeration returned by the HashTable are fail-safe in nature i.e they don’t throw any exceptions 
+    if the HashTable is modified after the creation of Enumeration.
+
+6) Performance
+
+    As HashTable is internally synchronized, this makes HashTable slightly slower than the HashMap.
+
+7) Legacy Class
+
+    HashTable is a legacy class. It is deprecation. Since JDK 1.5, ConcurrentHashMap is considered as better option than the HashTable.
+
+8) Member Of Java Collection Framework
+
+    HashMap is a member of Java Collection Framework right from the beginning of its introduction in JDK 1.2. But, HashTable was there before JDK 1.2. From JDK 1.2, 
+    it has been made to implement Map interface, making it a member of collection framework.
+
+9) When To Use What?
+
+    HashMap is always recommended if you don’t want thread safety. If you want thread safety, use either ConcurrentHashMap or make HashMap thread safe by using 
+    external synchronization through Collections.synchronizedMap() method. HashTable is not always recommended to use as it is considered as a legacy class.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Difference between ArrayList and Vector Class
+
+1) Thread Safety
+
+    This is the main difference between ArrayList and Vector class. ArrayList class is not thread safety where as Vector class is thread safe. Vector class is a 
+    synchronized class. Only one thread can enter into Vector object at any moment of time during execution. Where as ArrayList class is not synchronized. Multiple 
+    threads can access ArrayList object simultaneously. You can make the list thread safe by Collections.synchronizedList(list);
+
+2) Performance
+
+    ArrayList has better performance compared to Vector. It is because, Vector class is synchronized. It makes the threads to wait for object lock to enter into 
+    vector object.
+
+3) Capacity Increment
+
+    Whenever the size of the ArrayList exceeds it’s capacity, the capacity is increased by half of the current capacity. Where as in case of Vector, the capacity is 
+    increased by "Capacity" passed while creating the Vector object. If Capacity is not passed, capacity will be doubled automatically when the size 
+    exceeds it’s capacity. We can set the capacity of ArrayList(reference object) by ensureCapacity(int size). Printing the size of the list will print the no. of
+    elements present in the list & not the capacity of the list.
+
+5) Traversing The Elements.
+
+    ArrayList elements can be traversed using Iterator, ListIterator and using either normal or advanced for loop. But, vector elements can be traversed using 
+    Enumeration also along with these methods. Vector class has a method called elements() which returns Enumeration object containing all elements of the vector. 
+
+6) Searching The Elements.
+
+    In ArrayList, you have to start searching for a particular element from the beginning of an Arraylist. But in the Vector, you can start searching for a particular 
+    element from a particular position in a vector. This makes the search operation in Vector faster than in ArrayList.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+In Java, when using == to compare if two objects are equal, whats actually being compared is whether the references of the two objects are equal.
+
+Ex: 
+    Integer a = 100;      /* ex-1 */          |   Integer a = 1000;     // ex-2
+	Integer b = 100;                          |   Integer b = 1000;    
+	    
+	System.out.println(a == b); /* true */    |   System.out.println(a == b);  /* false */ 
+
+By logic, we can say that in ex-2, a & b points to different objects in heap memory so a == b will return false. But why ex-1 is returning true?
+
+ex-1 is returning true because if we assign a value directly to an "Integer" without using "new" keyword, then it will call Integer.valueOf().
+    Integer a = 100;   --> Integer a = Integer.valueOf(100);
+
+The Integer.valueOf() will check the value passed to it and it will check if the value is within the low & high boundaries in "IntegerCache" class
+
+    public static class IntegerCache{        // low = -128 and high = 127
+        static final int low = -128;
+        static int h = 127;
+    }
+
+The IntegerCache class caches the int between -128 to 127 and if the value passed to Integer.valueOf() is between this range(inc), then it will return the cached value
+So in ex-1, a = 100 & b = 100. Here 100 is between -128 to 127 so the references of a & b are same. So (a == b) returns true.
+
+In ex-2, value 1000 is outside -128 to 127 range so the references of a & b are different. It will return false;
+
+This is the reason why object's with small Integer id should not be cached. Two or more objects can contain same reference.

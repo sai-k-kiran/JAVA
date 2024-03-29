@@ -1,0 +1,509 @@
+JDBC:
+
+Java Database Connectivity. It provides a set of Java APIs for accessing the relational databases from Java program. These Java APIs enables Java programs 
+to execute SQL statements and interact with any SQL compliant database.
+
+JDBC provides a flexible architecture to write a database independent application that can run on different platforms and interact with different DBMS 
+without any modification.
+
+Pros of JDBC:
+    - Clean and simple SQL processing
+    - Good performance with large data
+    - Very good for small applications
+    - Simple syntax so easy to learn
+
+Cons of JDBC:
+    - Complex if it is used in large projects
+    - Large programming overhead
+    - No encapsulation
+    - Hard to implement MVC concept
+    - Query is DBMS specific
+
+Why Object Relational Mapping (ORM)?
+
+When we work with an object-oriented system, there is a mismatch between the object model and the relational database. RDBMS represent data in a tabular 
+format whereas object-oriented languages, such as Java or C# represent it as an interconnected graph of objects.
+
+While persisting the data into our database, what if we need to modify the design of our database after having developed a few pages or our application? 
+Second, loading and storing objects in a relational database exposes us to the following five mismatch problems −
+
+1. Granularity
+    Sometimes you will have an object model, which has more classes than the number of corresponding tables in the database.
+2. Inheritance
+    RDBMSs do not define anything similar to Inheritance, which is a natural paradigm in object-oriented programming languages.
+3. Identity
+    An RDBMS defines exactly one notion of 'sameness': the primary key. Java, however, defines both object identity (a==b) and object equality (a.equals(b)).
+4 Associations
+    Object-oriented languages represent associations using object references whereas an RDBMS represents an association as a foreign key column.
+5 Navigation
+    The ways you access objects in Java and in RDBMS are fundamentally different.
+
+The Object-Relational Mapping (ORM) is the solution to handle all the above impedance mismatches.
+
+What is ORM?
+ORM stands for Object-Relational Mapping (ORM) is a programming technique for converting data between relational databases and object oriented programming 
+languages such as Java, C#, etc. ORM system has the following advantages over plain JDBC −
+
+1 	Let’s business code access objects rather than DB tables.
+2 	Hides details of SQL queries from OO logic.
+3 	Based on JDBC 'under the hood.'
+4 	No need to deal with the database implementation.
+5 	Entities based on business concepts rather than database structure.
+6 	Transaction management and automatic key generation.
+7 	Fast development of application.
+
+Hibernate is an Object-Relational Mapping (ORM) solution for JAVA. It is a powerful, high performance Object-Relational Persistence and Query service 
+for any Java Application.
+
+Hibernate maps Java classes to database tables and from Java data types to SQL data types and relieves the developer from 95% of common data persistence 
+related programming tasks.
+
+Hibernate sits between traditional Java objects and database server to handle all the works in persisting those objects based on the appropriate O/R 
+mechanisms and patterns.
+
+Hibernate acts as an additional layer on top of JDBC and enables you to implement a database-independent persistence layer.
+Hibernate, as an ORM solution, effectively "sits between" the Java application data access layer and the Relational Database. The Java application makes 
+use of the Hibernate APIs to load, store, query, etc its domain data
+
+Hibernate uses various existing Java APIs, like JDBC, Java Transaction API(JTA), and Java Naming and Directory Interface (JNDI). JDBC provides a rudimentary 
+level of abstraction of functionality common to relational databases, allowing almost any database with a JDBC driver to be supported by Hibernate. JNDI and 
+JTA allow Hibernate to be integrated with J2EE application servers.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+ARCHITECTURE:
+
+Configuration object: 
+org.hibernate.cfg.Configuration is a predefined class which holds configuration properties of Hibernate, it’s created first when creating the Hibernate
+application, it has two components:
+    Database connection which provides the configuration for the connection.
+    The class mapping setup which creates the connection between the java class and the database.
+
+SessionFactory:
+It is an interface that provides methods to create and manage Hibernate Session objects. It is a thread-safe and immutable object used by all the threads 
+of an application that provides a cache of immutable objects. 
+
+The SessionFactory is a heavyweight object; it is usually created during application start up and kept for later use. You would need one SessionFactory object 
+per database using a separate configuration file. So, if you are using multiple databases, then you would have to create multiple SessionFactory objects.
+
+Session Object:
+The Session is an interface that is responsible for managing the persistence of objects and providing transactional support for the persistence operations. 
+The Session interface provides methods for querying, saving, updating, and deleting objects in the database.
+
+Session is a single-threaded, short-lived object representing a conversation between the application and the persistent store. It wraps JDBC java.sql.Connection 
+and works as a factory for org.hibernate.Transaction.
+
+Transaction Object:
+The Transaction is an interface that represents a database transaction. It provides methods to control the transaction, such as commit(), rollback(), and begin(). 
+The Transaction interface also provides methods to set the transaction isolation level and check the status of the transaction.
+
+This is an optional object and Hibernate applications may choose not to use this interface, instead managing transactions in their own application code.
+
+Transient objects:
+Transient objects are persistent objects that are not currently associated with a Session. They may have been instantiated by the application and not yet persisted, 
+or they may have been instantiated by a closed Session.
+
+ConnectionProvider: 
+ConnectionProvider is a factory for JDBC connections. It provides abstraction between the application and underlying javax.sql.DataSource or java.sql.DriverManager. 
+It is not exposed to application, but it can be extended by the developer.
+
+TransactionFactory: A factory for org.hibernate.Transaction instances.
+
+Query Object:
+Query objects use SQL or Hibernate Query Language (HQL) string to retrieve data from the database and create objects. A Query instance is used to bind query 
+parameters, limit the number of results returned by the query, and finally to execute the query.
+
+Criteria Object: Criteria objects are used to create and execute object oriented criteria queries to retrieve objects.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Object States:
+
+1. Transient state : When an object of an entity class has been created but not associated with any session object, then the entity object is said to be in 
+transient state.
+
+2. Persistent state: When an object is managed by a session object which is going to be persisted in the database in a transaction, the object is said to
+be in persistent state.
+
+3. Detached state: When the object after persisting in the database and closing the session, no longer managed by any session object, is said to be in detached state
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Some of the important advantages of Hibernate framework over JDBC are:
+
+    - Hibernate removes a lot of boilerplate code that comes with JDBC API, and the code looks cleaner and readable.
+
+    - Hibernate supports inheritance, associations, and collections. These features are not present with JDBC API.
+
+    - Hibernate implicitly provides transaction management, in fact, most of the queries can’t be executed outside a transaction. In JDBC API, we need to write 
+        code for transaction management using commit and rollback. JDBC API throws SQLException which is a checked exception, so we need to write a lot 
+        of try-catch block code. Most of the time it’s redundant in every JDBC call and used for transaction management. Hibernate wraps JDBC exceptions and 
+        throws JDBCException or HibernateException un-checked exceptions, so we don’t need to write code to handle it. Hibernate built-in transaction management 
+        removes the usage of try-catch blocks.
+
+    - Hibernate Query Language (HQL) is more object-oriented and close to a Java programming language. For JDBC, we need to write native SQL queries.
+
+    - Hibernate supports caching that is better for performance, JDBC queries are not cached hence performance is low.
+
+    - Hibernate provides an option through which we can create database tables too, for JDBC tables must exist in the database.
+
+    - Hibernate configuration helps us in using a JDBC-like connection as well as JNDI DataSource for a connection pool. This is a very important feature 
+        in enterprise applications and completely missing in JDBC API.
+
+    - Hibernate supports JPA annotations, so the code is independent of the implementation and easily replaceable with other ORM tools. JDBC code is very 
+        tightly coupled with the application.
+
+HIBERNATE PROPERTIES:
+
+- hibernate.dialect: This property makes Hibernate generate the appropriate SQL for the chosen database.
+- hibernate.connection.driver_class: The JDBC driver class.
+- hibernate.connection.url: The JDBC URL to the database instance.
+- hibernate.connection.username: The database username.
+- hibernate.connection.password: The database password.
+- hibernate.connection.pool_size: Limits the number of connections waiting in the Hibernate database connection pool.
+- hibernate.connection.autocommit: Allows autocommit mode to be used for the JDBC connection. Set this to false of you want to use transactions
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+SESSIONS:
+A Session is used to get a physical connection with a database. The Session object is lightweight and designed to be instantiated each time an interaction 
+is needed with the database. Persistent objects are saved and retrieved through a Session object.
+
+The session objects should not be kept open for a long time because they are not usually thread safe and they should be created and destroyed them as needed. 
+The main function of the Session is to offer, create, read, and delete operations for instances of mapped entity classes.
+
+Instances may exist in one of the following three states at a given point in time −
+
+- transient − A new instance of a persistent class, which is not associated with a Session and has no representation in the database and no identifier value 
+    is considered transient by Hibernate.
+
+- persistent − You can make a transient instance persistent by associating it with a Session. A persistent instance has a representation in the database, 
+    an identifier value and is associated with a Session.
+
+- detached − Once we close the Hibernate Session, the persistent instance will become a detached instance.
+
+A Session instance is serializable if its persistent classes are serializable. A typical transaction should use the following idiom −
+
+Inside hibernate.cfg.xml --> 
+
+<?xml version="1.0" ...>
+<!DOCTYPE hibernate-configuration PUBLIC
+    "-Hibernate/Hibernate Configuration DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+
+<hibernate-configuration>
+    <session-factory>
+        <property name="hibernate.connection.username">root</property>
+        <property name="hibernate.connection.password">1234</property>
+        <property name="hibernate.connection.url">jdbc:mysql://localhost:3306/my-db</property>
+        <property name="hibernate.connection.driver_class">com.mysql.cj.jdbc.driver</property>
+        <!-- Enable Hibernate's automatic session context management -->
+        <property name="hibernate.current_session_context_class">thread</property>
+    </session-factory>
+</hibernate-configuration>
+
+Configuration config = new Configuration();
+config.configure("hibernate.cfg.xml")        // hibernate.cfg.xml is in src/main/resources
+config.addAnnotatedClass(User.class)         // User is an Entity 
+
+SessionFactory sessionFactory = config.buildSessionFactory();
+
+Session session = sessionFactory.openSession();   // OR sessionFactory.getCurrentSession()   
+Transaction tx = null;
+User u = new User();
+
+try {
+   tx = session.beginTransaction();
+   u.setName("Sai");
+   u.set...
+   session.save(u);
+   tx.commit();               // OR session.getTransaction().commit();
+}
+catch (Exception e) {
+   if (tx != null) tx.rollback();
+   e.printStackTrace(); 
+} finally {
+   session.close();
+}
+
+If the Session throws an exception, the transaction must be rolled back and the session must be discarded.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+QUERY LANGUAGE:
+
+Hibernate Query Language (HQL) is an object-oriented query language, similar to SQL, but instead of operating on tables and columns, HQL works with 
+persistent objects and their properties. HQL queries are translated by Hibernate into conventional SQL queries, which in turns perform action on database.
+Although you can use SQL statements directly with Hibernate using Native SQL.
+
+EX:
+
+FROM Clause:
+Query query = session.createQuery("FROM Employee");        // fetch all from "Employee" table
+List results = query.list();
+
+AS Clause:
+Query query = session.createQuery("FROM Employee AS E");    // "FROM Employee E", AS keyword in optional
+List results = query.list();
+
+SELECT Clause:
+Query query = session.createQuery("SELECT E.firstName FROM Employee E");
+List results = query.list();
+
+WHERE Clause:
+Query query = session.createQuery("FROM Employee E WHERE E.id = 10");
+List results = query.list();
+
+ORDER BY Clause:
+Query query = session.createQuery("FROM Employee E WHERE E.id > 10 ORDER BY E.salary DESC");
+List results = query.list();
+
+Using Named Parameters:
+Query query = session.createQuery("FROM Employee E WHERE E.id = :employee_id");
+
+query.setParameter("employee_id",10);
+List results = query.list();
+
+UPDATE Clause:
+Query query = session.createQuery("UPDATE Employee set salary = 2000 WHERE id = 5");
+
+int result = query.executeUpdate();
+System.out.println("Rows affected: " + result);
+
+Pagination using Query:
+
+Query setFirstResult(int startPosition): takes an integer that represents the first row in your result set, starting with row 0.
+
+Query setMaxResults(int maxResult): This method tells Hibernate to retrieve "maxResults" number of objects.
+
+Query query = session.createQuery("FROM Employee");
+query.setFirstResult(1);
+query.setMaxResults(10);     // fetch 10 rows
+List results = query.list();
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+NATIVE SQL:
+
+You can use native SQL to express database queries if you want to utilize database-specific features such as query hints or the CONNECT keyword in Oracle. 
+Hibernate 3.x allows you to specify handwritten SQL, including stored procedures, for all create, update, delete, and load operations.
+
+Scalar Queries:
+
+SQLQuery query = session.createSQLQuery("SELECT first_name, salary FROM EMPLOYEE");
+query.setResultTransformer(Criteria.ALIAS_TO_ENTITY_MAP);       // get a list of scalars (values) from table.
+List results = query.list();    // contains records in key-value pairs.
+
+for(Object object : data) {
+    Map row = (Map)object;
+    System.out.print("First Name: " + row.get("first_name")); 
+    System.out.println(", Salary: " + row.get("salary")); 
+}
+
+Entity Queries:
+
+SQLQuery query = session.createSQLQuery("SELECT * FROM EMPLOYEE");
+query.addEntity(Employee.class);         // get entity objects as a whole
+List results = query.list();
+
+Named SQL Queries:
+
+SQLQuery query = session.createSQLQuery("SELECT * FROM EMPLOYEE WHERE id = :employee_id");
+query.addEntity(Employee.class);
+query.setParameter("employee_id", 10);
+List results = query.list();
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+The main difference between JPA and Hibernate is the fact that JPA is a specification. Hibernate is Red Hat’s implementation of the JPA spec.
+
+The JPA spec is collaboratively developed through the Java community process(JCP) & updates are released as Java specification requests(JSRs). 
+If the community agrees upon all of the changes proposed within a JSR, a new version of the API is released.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+The key to successful hibernate transaction management is the JPA "EntityManager". It's the only JPA component that can start transactions, commit transactions 
+and hook into Hibernate transactions that are already in progress. The JPA EntityManager is the cornerstone of Java persistence.
+
+EntityManager is really a wrapper around a Hibernate session when hibernate is used as a JPA provider. It even possible to extract the Session out of 
+EntityManager and completely bypass JPA. This can be useful when a method is available only in the hibernate session & working through  the SessionFactory 
+to obtain a Session instance is problematic.  
+
+EntityManager ex:  Create an Entity class "Player" as usual using @id, @Column etc.
+
+EntityManager instance can be obtained by creating "EntityManagerFactory". Factory creation is done when a developer invokes a method on the JPA's 
+static Persistence context object and provides the name of the persistence unit, as specified in the persistence.xml file.
+
+    <persistence-unit name="jpa-tutorial">
+
+EntityManagerFactory emf = Persistence.createEntityManagerFactory("jpa-tutorial");        // EntityManagerFactory
+
+After creatign the EntityManagerFactory, EntityManager can be accessed to begin transactions. 
+
+EntityManager entityManager = emf.createEntityManager();
+
+try {
+    entityManager.getTransaction().begin();
+
+    Player p = new Player();       // The state of this entity bean will be managed by hibernate once JPA transaction starts.
+    p.setPassword("abc123");
+    p.setName("Cameron");
+    p.setTest("Testing!!!");
+
+    entityManager.persist(p);
+
+    entityManager.getTransaction().commit();
+} catch(Exception e) {
+    entityManager.getTransaction().rollback();    // rollback in case of any error
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* Hibernate persist() method:
+
+The persist method is intended to add a new entity instance to the persistence context, i.e. transitioning an instance from a transient to persistent state.
+
+    Person person = new Person();
+    person.setName("John");
+    session.persist(person);
+
+The object is in the persistence context now, but not yet saved to the database. The generation of INSERT statements will occur only upon committing the transaction, or flushing or closing the session.
+
+If an instance is in persistent state, calling this method will no effect. If an instance is detached, calling this method will give an exception.
+The return type of this method is "void".
+
+* save():
+This method persists the instance, “first assigning a generated identifier.” The method will return the Serializable value of this identifier:
+
+If we call save method on an detached instance, it will create a new instance.
+
+    Person person = new Person();
+    person.setName("John");
+    Long id1 = (Long) session.save(person);
+
+    session.evict(person);                      // evict the instance from the context
+    Long id2 = (Long) session.save(person);     //  id2 != id1 coz we called save() on detached instance
+
+* merge():
+The main intention of the merge method is to update a persistent entity instance with new field values from a detached entity instance.
+
+    Person person = new Person(); 
+    person.setName("John"); 
+    session.save(person);
+
+    session.evict(person);
+    person.setName("Mary");
+
+    Person mergedPerson = (Person) session.merge(person);
+
+The merge method returns an object. It’s the mergedPerson object we loaded into the persistence context and updated, not the person object that we passed as an argument. They’re two different objects, and we usually need to discard the person object.
+
+* update():
+It acts upon a passed object (its return type is void). The update method transitions the passed object from a detached to persistent state.
+This method throws an exception if we pass it a transient entity. (PersistenceException)
+
+we save the object, evict (detach) it from the context, and then change its name and call update. The update takes place on the person object itself So we cant put the result of update() operation in a separate variable. Basically, we’re reattaching the existing entity instance to the persistence context, something the JPA specification doesn’t allow us to do:
+
+    Person person = new Person();
+    person.setName("John");
+    session.save(person);
+    session.evict(person);
+
+    person.setName("Mary");
+    session.update(person);
+
+*saveOrUpdate():
+The main difference of the saveOrUpdate method is that it doesn’t throw an exception when applied to a transient instance, instead it makes this transient instance persistent. The following code will persist a newly created instance of Person:
+
+    Person person = new Person();
+    person.setName("John");
+    session.saveOrUpdate(person);
+
+We can think of this method as a universal tool for making an object persistent regardless of its state, whether it’s transient or detached.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+HIBERNATE N+1 PROBLEM:
+The problem is when we fetch a record from a db, all its child records from table is also fetched. 
+Ex: If we fetch records of all employees from Employees table where Employee table as "one to many" relation with Address table, then all the records of each employee will be fetched too. That means if there are 4 employees in Employee table, additional 4 SQL queries will be executed to fetch addresses of each employee from Address
+table. 
+
+Employees Table:
+id   |   name   |     occ
+----------------------------
+1    |   Sai    |     Engineer
+2    |   Kiran  |     Engineer
+3    |   John   |     Developer
+
+Address Table:
+id   |  address |     emp_id
+----------------------------
+1    |   LA    |     1
+2    |   CA    |     1
+3    |   SF    |     2
+4    |   MI    |     1
+5    |   NY    |     1
+
+In Employee.java  -->                        |      In Address.java   -->
+    @OneToMany(mappedBy = "employee")        |          @ManyToOne(fetch = FetchType.EAGER)
+    List<Address> list;                      |          Employee employee;
+
+In AddressRepository.java  -->               |      In EmployeeRepository.java  --> 
+    List<Address> findAll();                 |          List<Employee> findAll();
+
+When we call the findAll() method of EmployeeRepository, the list of employees are returned. For each employee, the address is fetched from db. In Employee table, there are 3 records and for each record, its corresponding address is fetched. That means total 4(3 + 1) records will be fetched. 
+
+1. Select id, name, occ from employee;   --> Main query to fetch the list of employee
+2. Select id, address, emp_id from address where emp_id = ?  // for emp_id = 1
+3. Select id, address, emp_id from address where emp_id = ?  // for emp_id = 2
+4. Select id, address, emp_id from address where emp_id = ?  // for emp_id = 3
+
+If we fetch a specific record by id, then an additional 1 query will be executed to fetch all records of that employee only.
+1. Select id, name, occ from employee where id = 1;
+2. Select id, address, emp_id from address where emp_id = 1;
+
+When we call the findAll() method of AddressRepository, the list of addresses are returned. For each address, the employee is fetched from db. In Address table, there are 5 records.
+The address rows have emp_id 1 & 2. That means, when findAll() is called, 3(2 + 1) sql queries are executed:
+
+1. Select id, address, emp_id from address;   --> Main query to fetch the list of addresses
+2. select e.id, e.name, e.occ, a.employee_id, a.id, a.address 
+    from employees e left join address a on e.id = a.employee_id 
+    where e.id = ?    // id = 1
+3. select e.id, e.name, e.occ, a.employee_id, a.id, a.address 
+    from employees e left join address a on e.id = a.employee_id 
+    where e.id = ?    // id = 2
+
+This is the N+1 problem in any ORM. The N+1 query problem is said to occur when an ORM, like hibernate, executes 1 query to retrieve the parent entity and N queries to retrieve the child entities. As the number of entities in the database increases, the queries being executed separately can easily affect the performance of the application.
+
+To fix this:
+
+1. Set fetch type in @ManyToOne() to LAZY. By default, the fetch type is LAZY. This is just a makeshift solution
+
+2. EntityGraphs:
+EntityGraphs provides a way to formulate better performing queries by defining which entities need to be retrieved from the database using SQL JOINS.
+We can define an entity graph using a combination of @NamedEntityGraph and @EntityGraph annotations. Or, we can also define ad-hoc entity graphs with just the attributePaths argument of the @EntityGraph annotation.
+
+The definition of a named entity graph is done by the @NamedEntityGraph annotation at the entity. It defines a unique name and a list of attributes (the attributeNodes) that shall be loaded.
+
+@Entity
+@NamedEntityGraph(name = "emp_graph",
+    attributeNodes = @NamedAttributeNode("addresses")
+)
+public class Employee {
+	//...
+}
+
+public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
+    @EntityGraph(type = EntityGraph.EntityGraphType.FETCH, value = "emp_graph")
+    Employee findAll();
+}
+
+Instead of doing all that, you can just annotate the findAll() method with the @EntityGraph. No need to annotate the Employee class with @NamedEntityGraph
+
+public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+   
+    @EntityGraph(attributePaths = {"addresses"})
+    List<Employee> findAll();
+}
+
+The above will call SQL query as: Select e.id, a.emp_id, a.id, a.address, e.name, e.occ from employees e left join address a on e.id = a.emp_id
+
+3. Using JOIN FETCH in SQL query.
+public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+
+    @Query("SELECT e from Employee e LEFT JOIN FETCH e.addresses")   // addresses is the list in the Employee class
+    List<Employee> findAll();
+}
+
+SQL query = Select e.id, a.emp_id, a.id, a.address, e.name, e.occ from employees e left join address a on e.id = a.emp_id. Same as EntityGraph

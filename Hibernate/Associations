@@ -1,0 +1,280 @@
+One to Many Mapping:
+
+@Entity
+public class Post{
+    @Id
+    private int id;
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.PERSIST) // this is for bidirectional mapping. The value of mappedBy should be the field name of 
+    Set<Comment> comments;                                       // ManyToOne, post in our ex
+
+}
+
+@Entity
+public class Comment{  // owning side should be the entity with @ManyToOne
+    @Id
+    private int id;
+
+    @ManyToOne          // Many comments of one post
+    @JoinColumn(name = "post")    // the name of the foreign key column would be "post"
+    private Post post;
+
+}
+
+If the ownership is on opposite side(Post class in our ex), then remove the Post field in the Comment class & add a collection(set in our ex) to Post class. 
+Then the db will treat it as a many to many relationship & will create a 3rd table(Join table) which will contain the ids of post & comment.
+
+If we want to make the opposite side the owner but dont want a join table in db, we can use "@JoinColumn("post")" annotation above the collection(set in our ex).
+
+Bi-directional relationship in one to many mapping.
+
+For bidirectional mapping, we have to include "mappedBy" in the @OneToMany annotation in the opposite side, be it one-to-one, one-to-many or many-to-many mapping.
+CascadeType.PERSIST means if the parent entity is saved in the db, then save the associated chlid entities in the db also. In bidirectional mapping, each side has
+a cascading logic. Ex, if Comment side has @ManyToOne(cascade = CascadeType.REMOVE), then removing a comment will also remove the Post associated with it.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Many to Many mapping:
+
+Modeling a many-to-many relationship with POJOs is easy. We should include a Collection in both classes, which contains the elements of the others.
+
+@Entity
+class Student {             // Owner side
+    @Id
+    Long id;
+
+    @ManyToMany
+    @JoinTable(name = "course_like",                             // Name of the join table
+        joinColumns = @JoinColumn(name = "student_id"),          // owner side
+        inverseJoinColumns = @JoinColumn(name = "course_id"))    
+    Set<Course> likedCourses;
+}
+
+@Entity
+class Course {
+    @Id
+    Long id;
+
+    @ManyToMany(mappedBy = "likedCourses")
+    Set<Student> likes;
+}
+
+Many-to-many relationship doesn’t have an owner side in the database, we could configure the join table in the Course class and reference it from the Student class.
+
+
+Student Table:                    Join table(course_like):
+id   |   name                     student_id   |    course_id
+---------------                   ---------------------------
+1    |   Sai                            1      |        1
+2    |   Kiran                          2      |        1
+3    |   John                           3      |        2
+                                        2      |        2
+Course Table:
+id   | course_name 
+------------------
+1    |   Java   
+2    |   Python 
+
+Every Many-to-Many relationship has two sides:
+
+    - the owning side
+    - the non-owning (inverse side)
+
+Student entity is the owner of the relationship and Course entity is the inverse side.
+
+The join table is specified on the owning side (Student) using @JoinTable annotation. This relationship is bidirectional, the inverse side (Course) must use the 
+"mappedBy" element to specify the relationship field or property of the owning side. So, the side which doesn’t have the mappedBy attribute is the owner, the side 
+which has the mappedBy attribute is the inverse side. 
+
+The owner side is the side which Hibernate looks at to know which association exists. For example, if you add a Course in the "likedCourses" set of a Student, 
+a new row will be inserted by Hibernate in the join table (course_like). On the contrary, if you add a Student to the "likes" set of Course, nothing will be 
+modified in the database.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Many to Many Using a Composite Key:
+
+Let’s say we want to let students rate the courses. A student can rate any number of courses, and any number of students can rate the same course. Therefore, it’s 
+also a many-to-many relationship. 
+Where can we store the rating information? We can’t put it in the Student entity since a student can give different ratings to different courses. Similarly, 
+storing it in the Course entity wouldn’t be a good solution either.
+
+This is a situation when the relationship itself has an attribute.
+
+Since we map DB attributes to class fields in JPA, we need to create a new entity class for the relationship.
+Every JPA entity needs a primary key. Because our primary key is a composite key, we have to create a new class that will hold the different parts of the key:
+
+@Embeddable
+class CourseRatingKey implements Serializable {       // Composite key class
+    @Column(name = "student_id")
+    Long studentId;
+
+    @Column(name = "course_id")
+    Long courseId;
+}
+
+@Entity
+class CourseRating {
+    @EmbeddedId              // Annotation signifies that this field is a composite key
+    CourseRatingKey id;
+
+    @ManyToOne
+    @MapsId("studentId")     // @MapsId means that we tie the fields to a part of the key, and they’re the foreign keys of a many-to-one relationship.
+    @JoinColumn(name = "student_id")
+    Student student;
+
+    @ManyToOne
+    @MapsId("courseId")
+    @JoinColumn(name = "course_id")
+    Course course;
+
+    int rating; 
+}
+
+class Student {                               |         class Course {
+                                              |              
+    // ...                                    |             // ...
+                                              |             
+    @OneToMany(mappedBy = "student")          |             @OneToMany(mappedBy = "course")
+    Set<CourseRating> ratings;                |             Set<CourseRating> ratings;
+}                                             |          }
+
+Note that there’s an alternative way to use composite keys: the @IdClass annotation.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* HOW TO JOIN UNRELATED ENTITIES 
+EX: There are 2 tables : Person & PhoneBook. Both tables have firstName & lastName columns. We will use these 2 columns for join
+
+Person Table:                                   PhoneBook table
+id   |   firstName  |  lastName                 id   |    firstName  | lastName |  phoneNumber
+--------------- ----------                  ---------------------------------------------------
+1    |   Sai        |   Kiran                  1      |    Sai       | Kiran    |   7698178378
+2    |   Mark       |   Gruber                 2      |    Mark      | Gruber   |   9978356486
+3    |   John       |   Doe                    3      |    Sai       | Kiran    |   7698178756
+
+Before Hibernate 5.1
+
+EntityManager em = emf.createEntityManager();
+em.getTransaction().begin();
+     
+List<Object[]> results = em.createQuery("SELECT p.firstName, p.lastName, n.phoneNumber FROM Person p, PhoneBook n 
+                                        WHERE p.firstName = n.firstName AND p.lastName = n.lastName").getResultList();
+ 
+em.getTransaction().commit();
+
+Hibernate transforms this into a cross join which creates the same result as an inner join when you add the join condition to the WHERE statement.
+
+This approach has two disadvantages:
+
+    - It is not as easy to read as an inner join especially if the WHERE statement gets complex and is often the cause of additional bugs.
+    - You can’t create an outer join which for example returns all PersonEntities and if there is a matching record, their phone number.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Hibernate 5.1
+
+List<Object[]> results = em.createQuery("SELECT p.firstName, p.lastName, n.phoneNumber FROM Person p JOIN PhoneBook n 
+                                        ON p.firstName = n.firstName AND p.lastName = n.lastName").getResultList();
+
+This creates the expected INNER JOIN in the SQL statement and is much easier to read than the cross join in the previous example.
+
+And you can use the same syntax to define an OUTER JOIN between the two entities:
+     
+List<Object[]> results = em.createQuery("SELECT p.firstName, p.lastName, n.phoneNumber FROM Person p LEFT JOIN PhoneBookEntry n 
+                                        ON p.firstName = n.firstName AND p.lastName = n.lastName").getResultList();
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Fetching recursive associations with JPA and Hibernate:
+
+Recursive table relationships are built using self-referencing Foreign Key columns so that a record in a table can reference another record in the very same table, 
+therefore allowing us to represent hierarchical structures using the relational model. For ex:
+Category can have sub-category & it can have its sub-category. Java > JPA > Hibernate > Hibernate 6  --> These are all categories (& its sub-categories).
+
+@Entity                                                 @Entity
+class Category {                              |         class Book {
+    @Id                                       |             @Id
+    @GeneratedValue(...)                      |             @GeneratedValue(...)
+    private short id                          |             private Long id;
+
+    @Column(length = 25)                      |             @Column(length = 50)
+    private String name;                      |             private String title;
+
+    @ManyToOne(fetch = FetchType.LAZY)        |             @Column(columnDefinition = "numeric(13)")
+    private Category parent;                  |             @NaturalId
+}                                             |             private long isbn;
+
+                                              |             @ManyToOne(fetch = FetchType.LAZY)
+                                              |             private Category category;
+                                              |         }
+
+Category Table:                               Book table
+id   |   name       |  parent_id                 id   |    title        |  isbn     | category_id
+--------------- ----------                  ---------------------------------------------------
+1    |   Java       |   null                   1      |    Java Book    |   89654   |  1 (Java)
+2    |   Jpa        |   Java                   2      |    Hibernate    |   87365   |  3 (Hibernate)
+3    |   Hibernate  |   Jpa                    3      |    Persistence  |   98273   |  2 (Jpa)
+
+Category java = new Category().setName("Java");
+
+Category jpa = new Category().setName("JPA")
+    .setParent(java);
+
+Category hibernate = new Category().setName("Hibernate")
+    .setParent(jpa);
+
+entityManager.persist(java);
+entityManager.persist(jpa);
+entityManager.persist(hibernate);
+
+entityManager.persist(
+    new Book()
+        .setTitle("Java Book ")
+        .setIsbn(89654)
+        .setCategory(Java)
+);
+⠀
+entityManager.persist(
+    new Book()
+        .setTitle("Hibernate")
+        .setIsbn(87365)
+        .setCategory(Hibernate)
+);
+
+Fetching recursive associations with JPA and Hibernate can be done in two ways:
+
+1. We can use the JOIN FETCH clause in a JPQL query or
+    
+Book hpjp = doInJPA(entityManager -> {
+    return entityManager.createQuery("""
+        select b from Book b
+        left join fetch b.category c1
+        left join fetch c1.parent c2
+        left join fetch c2.parent c3
+        where b.isbn = :isbn
+        """, Book.class)
+    .setParameter("isbn", 87365)
+    .getSingleResult();
+});
+
+Category hpjpCategory = hpjp.getCategory();
+
+Above JPQL query is same as:
+
+SELECT
+   b.id, b.isbn, b.title,
+   c.id, c.name,
+   p1.id, p1.name,
+   p2.id, p2.name
+FROM book b
+LEFT JOIN category c ON c.id = b.category_id
+LEFT JOIN category p1 ON p1.id = c.parent_id
+LEFT JOIN category p2 ON p2.id = p1.parent_id
+WHERE b.isbn = 87365
+
+Fetching the first record from Book table:
+
+String jpql = "select b from Book b 
+               left join fetch b.category_id = b.category where b.isbn = 89654";
+
+Book javaBook = entityManager.createQuery(jpql, Book.class);
+
+Another approach to fetching the book and the associated category hierarchy is to use a Recursive CTE and LATERAL JOIN query.

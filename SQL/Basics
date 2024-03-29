@@ -1,0 +1,246 @@
+Window functions:
+
+In SQL, window functions, also known as analytical functions, operate similarly to aggregate functions, which compute all table rows in a set. However, window functions 
+differ in that they do not aggregate all rows into a single output row. Instead, these functions return all rows in a table, with a computed column showing the specific 
+function applied to each row. Common examples of window functions include ROW_NUMBER(), RANK(), DENSE_RANK(), LEAD(), and LAG().
+
+Window functions are used to perform some operation on a group of rows and provide a resultant value for each row in the table.
+
+- Aggregate Window Functions in SQL: SUM(), MIN(), MAX(), COUNT(), AVG()
+
+- Ranking Window Functions in SQL: ROW_NUMBER(), RANK(), DENSE_RANK()
+
+- Value Window Functions in SQL: LEAD(), LAG()
+
+Return the sum of salaries of all employees in a dept:
+    SELECT *, SUM(salary) OVER(partition by dept_name) AS total_salary FROM employee;  -- See the table below
+
+Fetch the minimum salary of an employee within a department group:
+    SELECT *, MIN(salary) OVER(partition by dept_name) AS 'TOTAL' FROM employee;
+
+Fetch the total number of employees within a department group:
+    SELECT *, COUNT(emp_id) OVER (PARTITION BY dept_name) AS COUNT FROM employee;
+
+Return average of the salaries of all employee of a department:
+    SELECT *, AVG(salary) OVER (PARTITION BY dept_name) AS 'AVG_SALARY' FROM employee;
+
+    Name      last_name   dept_name   salary     TOTAL
+    --------------------------------------------------
+    Alex	    Miller  	HR	      100	      330
+    John	    Jones	    HR	      120	      330   -- 330 is the sum of salaries of all employees from HR dept
+    Max	        Weber	    HR  	  110	      330
+    Kate	    Williams	DEV	      200	      500   -- 500 is the sum of salaries of all employees from DEV dept
+    Nick	    Jackson 	DEV       300	      500      
+
+LAG() - This function allows us to retrieve data from the preceding row in the same result set, without using the SQL joins.
+
+    SELECT *, LAG(salary) OVER (PARTITION BY dept_name) AS 'PREV' FROM employee;
+
+    Name      last_name   dept_name   salary     PREV
+    --------------------------------------------------
+    Alex	    Miller  	HR	      100	      null   -- no previous row so null
+    John	    Jones	    HR	      120	      100    -- 100 is the salary of prev row's employee
+    Max	        Weber	    HR  	  110	      120
+
+    Kate	    Williams	DEV	      200	      null    -- new partition so no prev row in this partition
+    Nick	    Jackson 	DEV       300	      200     
+
+LEAD() -  This function allows us to retrieve data from the next row in the same result set, without using SQL joins.
+
+    SELECT *, LEAD(salary) OVER(PARTITION BY dept_name) AS 'NEXT' FROM employee;
+
+    Name      last_name   dept_name   salary     NEXT
+    --------------------------------------------------
+    Alex	    Miller  	HR	      100	      120   
+    John	    Jones	    HR	      120	      110    -- 100 is the salary of prev row's employee
+    Max	        Weber	    HR  	  110	      null   -- no next row so null
+
+    Kate	    Williams	DEV	      200	      300    
+    Nick	    Jackson 	DEV       300	      null   -- new partition so no next row in this partition
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+RANK() Function:
+The RANK() function is one of the window functions in SQL. Window functions look at part of the data and compute the results for this part. The RANK() function, 
+specifically, assigns a rank to each row based on a provided column. RANK() is included in the SELECT statement with the following syntax:
+
+The first row gets rank 1, and the following rows get higher rankings. If any rows have the same value in the column used for ordering, they are ranked the same. 
+The RANK() function leaves gaps in such cases.
+
+    SELECT first_name, last_name, level, years_experience,
+        RANK() OVER (ORDER BY years_experience DESC)
+    FROM developers;
+
+Name        last_name   level      YOE  rank
+----------------------------------------------
+Alex	    Miller  	senior	    8	1
+John	    Jones	    senior	    5	2
+Max	        Weber	    mid-level	4	3
+Kate	    Williams	senior	    4	3       -- there is no rank 4 coz the years_experience is same as Max Weber
+Nick	    Jackson 	mid-level	3	5       -- The order is maintained, even though there is no rank 4, we jumped to rank 5
+Sophia	    Moore	    mid-level	3	5
+Steven	    Martin	    junior	    2	7
+Megan	    Stevens	    junior	    1	8
+Jack	    Davis	    junior	    1	8      
+Helen	    Brown	    junior	    0	10
+
+Ranking Within Different Groups:
+
+    SELECT first_name, last_name, level, years_experience,
+        RANK() OVER (PARTITION BY level ORDER BY years_experience  DESC)
+    FROM developers;
+
+Steven	    Martin	    junior	    2	1    -- grouped by junior level
+Jack	    Davis	    junior	    1	2
+Megan	    Stevens	    junior	    1	2
+Helen	    Brown	    junior	    0	4
+
+Max	        Weber	    mid-level	4	1    -- grouped by mid level
+Nick	    Jackson	    mid-level	3	2
+Sophia	    Moore	    mid-level	3	2
+
+Alex	    Miller	    senior	    8	1    -- grouped by senior level
+John	    Jones	    senior  	5	2
+Kate	    Williams	senior  	4	3
+
+RANK() function gives the same rank to records with the same value and leaves a gap to account for these records,
+    - DENSE_RANK() function doesn’t leave a gap;
+    - ROW_NUMBER() function ranks all records differently, even if the values are the same.
+    - NTILE() is used to divide rows of a partition into "n" number of pre-defined approximately equal groups
+
+    SELECT first_name, last_name, level, years_experience,
+        RANK() OVER (ORDER BY years_experience DESC),
+        DENSE_RANK() OVER (ORDER BY years_experience DESC),
+        ROW_NUMBER() OVER (ORDER BY years_experience DESC)
+    FROM developers;
+
+first       last        level     YOE    rank    dense    row_num
+Alex	    Miller	    senior	    8	    1	    1	    1
+John	    Jones	    senior	    5	    2	    2	    2
+Max	        Weber	    mid-level	4	    3	    3	    3
+Kate	    Williams	senior	    4	    3	    3	    4
+Nick	    Jackson	    mid-level	3	    5	    4	    5
+Sophia	    Moore	    mid-level	3	    5	    4	    6
+Steven	    Martin	    junior	    2   	7	    5	    7
+Megan	    Stevens	    junior	    1   	8	    6	    8
+Jack	    Davis	    junior	    1   	8	    6	    9
+Helen	    Brown	    junior	    0   	10	    7	    10
+
+Ex: Ranking sales performance:
+    SELECT NAME, SALES, RANK() OVER(ORDER BY SALES DESC) AS 'SALES_RANK' FROM SALES_TABLE;  
+
+Ex: Pagination:
+    SELECT PRODUCT_NAME, PRICE, RANK() OVER(ORDER BY PRICE DESC) FROM PRODUCTS_TABLE WHERE PRICE BETWEEN 1 AND 10;
+
+Ex: Return duplicate rows:
+    SELECT NAME, ORDER_NUM, RANK() OVER(PARTITION BY NAME ORDER BY ORDER_NUM) AS 'ORDER_RANK' 
+    FROM ORDERS_TABLE HAVING ORDER_RANK > 1 
+
+Ex:
+WITH payroll AS (
+	SELECT first_name, last_name, department_id, salary,  -- group the emps by dept and order them by salary ASC
+		RANK() OVER (PARTITION BY department_id ORDER BY salary) salary_rank
+	FROM employees
+)
+SELECT first_name, last_name,department_name,salary     -- select all emps whose rank is 2 
+FROM payroll p INNER JOIN departments d 
+		ON d.department_id = p.department_id WHERE salary_rank = 2;	
+
+Ex. Give rank to students according to their marks:
+
+    SELECT NAME, SUBJECT, MARKS,  
+    DENSE_RANK() OVER(ORDER BY MARKS DESC) AS 'RANK'
+    FROM STUDENT;
+
+Give rank to students according to their marks and subjects:
+
+    SELECT NAME, SUBJECT, MARKS,
+    ROW_NUMBER() OVER (PARTITION BY SUBJECT ORDER BY MARKS) AS 'RANK'
+    FROM STUDENT;
+
+Ex:
+SELECT *, NTILE(3) OVER(ORDER BY MARKS DESC) AS 'RANK'
+FROM STUDENT;	
+
++---------+---------+-------+------+
+| NAME    | SUBJECT | MARKS | RANK |
++---------+---------+-------+------+
+| Naman   | DAA     |    97 |    1 |
+| Saloni  | OOP     |    90 |    1 |
+| Ankit   | DBMS    |    80 |    1 |
+| Paras   | EC      |    75 |    2 |
+| Paras   | DAA     |    74 |    2 |
+| Rishabh | EC      |    74 |    2 |
+| Mudit   | AI      |    70 |    3 |
+| Amit    | DAA     |    64 |    3 |
++---------+---------+-------+------+
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+OVER():
+With GROUP BY you can only have the aggregated values for the columns that are not included in GROUP BY. i.e you can group employees by dept by cant select individual
+salaries. You have to use an aggregate function like SUM(), MAX(), MIN() etc. on salary column.
+
+In some cases, aggregate functions cannot be used because they collapse all the individual records into a group; this makes it impossible to refer to specific values 
+(like one employee’s salary out of the group). In these situations, window functions are preferred because they do not collapse rows; you can refer to a column value 
+at the row level as well as the aggregate value.
+
+It is used with the window functions to specify the partitions and the order of rows in which the result should be obtained. It is also a mandatory argument to use 
+the window function property.
+
+With OVER() function, we can group the records without collapsing the rows so we can access individual rows too.
+
+Ex: We want to count cars by their manufacturing year but also select individual rows:
+    With GROUP BY -> SELECT YEAR, COUNT(*) FROM CARS GROUP BY MANUFACTURING_YEAR;  
+
+    YEAR      COUNT   
+    --------------
+    2005       1   -- We cant see what car was made in 2005 as we cant aggregate TEXT columns
+    2008       2   
+
+This will return 1 row for each manufacturing year with count. But we want to get the names and color of each car too. In that case, we have to use OVER()
+
+    SELECT NAME, COLOR, MANUFACTURING_YEAR, COUNT(*) OVER(PARTITION BY MANUFACTURING_YEAR) AS 'COUNT' FROM CARS;
+
+    Name        Color      YEAR      COUNT
+    ---------------------------------------
+    1234JKLM    Chevy      2005       1
+    5678ASDF    Ford       2008       2
+    1234ASDF    Ford       2008       2
+
+We can get the above result by WITH clause:
+
+    WITH EQ AS (SELECT YEAR AS YEAR2, COUNT(*) AS COUNT2 FROM CARS GROUP BY YEAR)
+    SELECT Name, Color, YEAR, COUNT2 FROM CARS, EQ
+    WHERE EQ.YEAR2 = CARS.YEAR;
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+SQL CORRELATED SUBQUERY:
+Unlike a plain subquery, a correlated subquery is a subquery that uses the values from the outer query. Also, a correlated subquery may be evaluated once for each row 
+selected by the outer query. Because of this, a query that uses a correlated subquery may be slow. Also known as a repeating subquery or a synchronized subquery.
+
+    SELECT employee_id, first_name, last_name, salary FROM employees     -- Not a correlated sub query
+    WHERE salary > (SELECT AVG(salary) FROM employees);
+
+In above query:
+    - you can execute the subquery that returns the average salary of all employees independently.
+    - the database system needs to evaluate the subquery only once.
+    - The outer query depends on the subquery for its value
+
+The following query finds all employees whose salary is higher than the average salary of the employees in their departments:
+
+    SELECT employee_id, first_name, last_name, salary, department_id
+    FROM employees e WHERE salary > (SELECT AVG(salary) FROM employees WHERE department_id = e.department_id)
+    ORDER BY department_id, first_name, last_name;
+
+For each employee, the db has to execute the correlated subquery once to calculate the average salary of the employees in the department of the current employee.
+
+The following query returns the employees and the average salary of all employees in their departments:
+
+    SELECT employee_id, first_name, last_name, department_name, salary,
+        (SELECT ROUND(AVG(salary), 0) FROM employees WHERE department_id = e.department_id) avg_salary_in_department
+    FROM employees e INNER JOIN departments d ON d.department_id = e.department_id
+    ORDER BY department_name, first_name, last_name;
+
+For each employee, the db has to execute the correlated subquery once to calculate the average salary by the employee’s department. 
+The above query can be written by using OVER() clause:
+    SELECT *, AVG(salary) OVER (PARTITION BY department_name) AS 'avg_salary' FROM employees  -- same output as above query

@@ -1,0 +1,195 @@
+Q: What is a REST API?
+
+REST API is an app programming interface architecture style that conforms to specific arch constraints like stateless communication and cacheable data.
+It is not a protocol or standard. While REST APIs can be accessed through a number of communication protocols, most commonly, they are called over HTTPS, 
+so the guidelines below apply to REST API endpoints that will be called over the internet.
+
+What is stateless in a REST API?
+
+Being stateless means that every HTTP request or an API call will happen in isolation. 
+Application state is the information of the app stored at server side to identify incoming requests and previous interaction.
+
+So stateless means the server does not store any data to process the API call. All the data needed to process that request is stored by client, in browser.
+If any information is required from the previous request, the client will share it in the current request.
+Each request from the client to server must contain all the information needed to process that request and that information cannot be stored at the server side 
+for any future reference. This restriction is called Statelessness.
+
+Advantages of REST Statelessness:
+
+    Easily Scalable: As there is no need for any stored information, any server can handle any client request. Thus, many concurrent requests can be 
+        processed by deploying API to multiple servers.
+    Decreased Complexity: As state synchronization is not needed, it reduces the complexity.
+    Improved Performance: Server doesn’t need to keep track of client requests, which increases the performance.
+
+Disadvantages of REST Statelessness:
+
+    Increased request size: The request size becomes very big many times as it contains all the information about the request and previous transactions.
+
+EXAMPLE of Statelessness:
+
+Suppose we have an API where we want to log in and order some goods, the API deployed on many servers can serve many requests, even from the 
+same account without storing the authentication details or provided token state.
+
+Every time client is making a request it will send the authentication details as well as the other required information and that request can 
+be processed easily at the server side as it includes all the information needed to fulfill the request.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+A REST API should accept and respond with JSON:
+
+REST APIs should accept JSON for request payload and also send responses to JSON. JSON is the standard for transferring data. Almost every networked technology
+can use it: JavaScript has built-in methods to encode and decode JSON either through the Fetch API or another HTTP client. Server-side technologies have 
+libraries that can decode JSON without doing much work. Like java has jackson library.
+
+There are other ways to transfer data such as XML. But it is not widely supported by frameworks without transforming the data ourselves to 
+something that can be used, and that’s usually JSON.  We can’t manipulate this data as easily on the client-side, especially in browsers. It ends up being a 
+lot of extra work just to do normal data transfer.
+
+To make sure that when our REST API app responds with JSON that clients interpret it as such, we should set Content-Type in the response header to
+application/json after the request is made. Many server-side app frameworks set the response header automatically. 
+Some HTTP clients look at the Content-Type response header and parse the data according to that format.
+
+The only exception is if we’re trying to send and receive files between client and server. Then we need to handle file responses and send form data from 
+client to server.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Use nouns instead of verbs in endpoint paths:
+
+We should use the nouns which represent the entity that the endpoint that we're retrieving or manipulating as the pathname. Pathname is /posts, /customers etc.
+This is because our HTTP request method already has the verb. Having verbs in our API endpoint paths isn’t useful and it makes it unnecessarily 
+long since it doesn’t convey any new information.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Use logical nesting on endpoints:
+
+When designing endpoints, it makes sense to group those that contain associated information. That is, if one object can contain another object,
+you should design the endpoint to reflect that. This is good practice regardless of whether your data is structured like this in your database.
+
+Ex: /customers/:customerId  --> 
+/customers is the pathname which returns all the customers and /customers/:customerId returns the customer with "customerId".
+Since both the pathname contains same entities (i.e Customer), it is advisable to club the two pathnames to create a nested endpoint.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Handle errors gracefully and return standard error codes:
+
+To eliminate confusion for API users when an error occurs, we should handle errors gracefully and return HTTP response codes that indicate what kind of 
+error occurred. This gives maintainers of the API enough information to understand the problem that’s occurred. 
+To indicate what type of error has occured, our API should return appropriate status code. Because the frontend of the application is coupled with server responses
+through the error codes. We can show a graceful fallback when an error occurs instead of showing Error: 500, Internal server error.
+
+Error codes need to have messages accompanied with them so that the maintainers have enough information to troubleshoot the issue.
+Whenever our API does not successfully complete, we should fail gracefully by sending an error with information to help users make corrective action. 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Allow filtering, sorting, and pagination:
+
+The databases behind a REST API can get very large. Sometimes, there's so much data that it shouldn’t be returned all at once because it’s way too 
+slow or will bring down our systems. Therefore, we need ways to filter items.
+
+We also need ways to paginate data so that we only return a few results at a time. We don't want to tie up resources for too long by trying to get all 
+the requested data at once.
+
+Filtering and pagination both increase performance by reducing the usage of server resources. As more data accumulates in the database, the more important 
+these features become. 
+
+We can specify the fields to sort by in the query string. For instance, we can get the parameter from a query string with the fields we want to sort 
+the data for. Then we can sort them by those individual fields. 
+
+Ex: /employees?lastName=Smith&age=30, here the query params are lastName=Smith and age=30, so filter the response of the API and send that data which has 
+lastName=Smith and age=30.
+
+we can accept the page query parameter and return a group of entries in the position from (page - 1) * 20 to page * 20. 
+
+We can also specify the fields to sort by in the query string. We can get a field of the table as a param from a query string and sort the response by those 
+individual field.
+
+Ex: http://example.com/articles?sort=+author,-datepublished, means sort the data frm tables in asc order of the "author" and desc order of "datepublished".
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Maintain good security practices:
+
+Most communication between client and server should be private since we often send and receive private information. Therefore, using SSL/TLS for security is a must.
+
+A SSL certificate isn't too difficult to load onto a server and the cost is free or very low. There's no reason not to make our REST APIs communicate over secure 
+channels instead of in the open.
+
+People shouldn't be able to access more information that they requested. For example, a normal user shouldn't be able to access information of another user. 
+They also shouldn't be able to access data of admins.
+
+To enforce the principle of least privilege, we need to add role checks either for a single role, or have more granular roles for each user.
+
+If we choose to group users into a few roles, then the roles should have the permissions that cover all they need and no more. If we have more granular 
+permissions for each feature that users have access to, then we have to make sure that admins can add and remove those features from each user accordingly. 
+Also, we need to add some preset roles that can be applied to a group users so that we don’t have to do that for every user manually. 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Cache data to improve performance:
+
+We can add caching to return data from the local memory cache instead of querying the database to get the data every time we want to retrieve some data that 
+users request. The good thing about caching is that users can get data faster. However, the data that users get may be outdated. This may also lead to issues 
+when debugging in production environments when something goes wrong as we keep seeing old data.
+
+There are many kinds of caching solutions like Redis, in-memory caching, and more. We can change the way data is cached as our needs change.
+
+If you are using caching, you should also include Cache-Control information in your headers. This will help users effectively use your caching system.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Versioning our APIs:
+
+We should have different versions of API if we're making any changes to them that may break clients. The versioning can be done according to semantic version 
+(for example, 2.0.6 to indicate major version 2 and the sixth patch) like most apps do nowadays. 
+
+This way, we can gradually phase out old endpoints instead of forcing everyone to move to the new API at the same time. The v1 endpoint can stay active 
+for people who don’t want to change, while the v2, with its shiny new features, can serve those who are ready to upgrade. This is especially important if 
+our API is public. We should version them so that we won't break third party apps that use our APIs.
+
+Versioning is usually done with /v1/, /v2/, etc. added at the start of the API path. 
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Idempotency:
+
+Idempotency is a property of operations or API requests that ensures repeating the operation multiple times produces the same result as executing it once. 
+Safe methods are idempotent but not all idempotent methods are safe. Only POST & PATCH operations are not idempotent.
+
+Idempotency is important in APIs because a resource may be called multiple times if the network is interrupted. In this scenario, non-idempotent operations can 
+cause significant unintended side-effects by creating additional resources or changing them unexpectedly. When a business relies on the accuracy of its data, 
+non-idempotency posts a significant risk. 
+
+Idempotency is crucial for ensuring the following:
+
+    - Consistency: The system maintains a predictable state, even when faced with request duplication or retries.
+    - Error Handling: Idempotent operations simplify error handling, as clients can safely retry requests without the risk of unintended side effects.
+    - Fault Tolerance: Idempotent APIs can better cope with network issues and other disruptions, ensuring a more reliable user experience.
+
+How duplicate requests come to server?
+
+SEQUENTIAL: If the client has a timeout (Like billdesk) and the server takes more time than the timeout. The request will fail because of timeout even though the server
+successfully processed it. The client if makes the same request again, it will be a duplicate request for server.
+
+PARALLEL: Because of parallel nature, same request can be served to the server before the server can finish processing it.
+
+Approach for Idempotency handling - Using Idempotency key:
+
+    Client should generate idempotency key
+    Client should generate a new idempotency key for a new request.
+
+1. First client generates idempotency key and sets it in the request header of the request
+
+2. Server will validate for presence of idempotency key in the header, if not it will throw error 400.
+
+3. Server will check for the idempotency key in the DB.
+
+4. It will put the idempotency key in the DB in "Created/Acquired" state. If the server processes the request, it will set the state of the key to "Consumed/Claimed"
+    If the key is consumed/claimed, it cannot be used for other requests i.e a duplicate request.
+
+4. If key is present in DB, server will check for its state. If it is "Consumed", send HTTP 200 means request already processed. Otherwise, send 409 (Conflict).
+
+If duplicate requests come in parallel, we can acquire a lock on step 3. That means only 1 thread(so only 1 request) can move forward and server will process
+that request. We can acquire lock mutual exclusion of threads using semaphore, mutex or synchronised

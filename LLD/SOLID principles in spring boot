@@ -1,0 +1,330 @@
+1. Single Responsibility Principle (SRP):
+A class should have one, and only one, reason to change. The Single Responsibility principle has two key principles, as the name suggests.
+To implement SRP in Spring Boot, we can create separate classes for different responsibilities.
+
+    - The class or method should have only one reason to change on can be chnaged by only one actor
+    - The class or method should have only one responsibility.
+
+    @RestController
+    @RequestMapping("/report")                    // Incorrect implementation of SRP
+    public class ReportController {
+        @Autowired
+        private final ReportService reportService;
+
+        @PostMapping("/send")
+        public ResponseEntity<Report> generateAndSendReport(@RequestParam String reportContent,
+                                                            @RequestParam String to,
+                                                            @RequestParam String subject) {
+            String report = reportService.generateReport(reportContent);
+            reportService.sendReportByEmail(report, to, subject);
+            return new ResponseEntity<>(HttpStatus.OK);
+        }
+    }
+
+    @Service
+    @Slf4j
+    public class ReportServiceImpl implements ReportService {
+        @Autowired
+        private final ReportRepository reportRepository;
+
+        @Override
+        public String generateReport(String reportContent) {
+            // ....
+            return reportRepository.save(report).toString();   //  saving it to the repository, 1 responsibility
+        }
+
+        @Override
+        public void sendReportByEmail(Long reportId, String to, String subject) {
+            Report report = reportRepository.findById(reportId); 
+            sendEmail(report.getReportContent(), to, subject);   // send email, 2nd responsibility
+        }
+
+        private void sendEmail(String content, String to, String subject) {
+            log.info(content, to, subject);
+        }
+    }
+
+As you can see ReportService has multiple responsibilities which violates Single Responsibility:
+    - Generate Report: The class is responsible for generating a report and saving it to the repository in the generateReport() method.
+    - Send Report by Email: The class is also responsible for sending a report by email in the sendReportByEmail method.
+
+This makes the code complex and hard to handle. It also makes it tricky to make small changes because they might affect other parts of the code, requiring to test 
+everything even for minor updates. Let’s correct this implementation
+
+    @RestController
+    @RequestMapping("/report")
+    public class ReportController {
+
+        private final ReportService reportService;    // bean injection through constructor. Constructor injection is not shown here to save lines
+        private final EmailService emailService;      // bean injection through constructor
+
+        @PostMapping("/send")
+        public ResponseEntity<Report> generateAndSendReport(@RequestParam String reportContent,
+                                                            @RequestParam String to,
+                                                            @RequestParam String subject) {
+            
+            Long reportId = Long.valueOf(reportService.generateReport(reportContent));  // correct impl reportService is responsible for generation
+            
+            emailService.sendReportByEmail(reportId, to, subject);  // correct impl emailService is responsible for sending
+            return new ResponseEntity<>(HttpStatus.OK);
+        }
+    }
+
+    @Service
+    public class ReportServiceImpl implements ReportService {     // Report service
+        @Autowired
+        private final ReportRepository reportRepository;
+
+        @Override
+        public String generateReport(String reportContent) {
+            Report report = new Report();
+            report.setReportContent(reportContent);
+            return reportRepository.save(report).toString();
+        }
+    }
+
+
+    @Service
+    public class EmailServiceImpl implements EmailService {   // Email service
+        @Autowired
+        private final ReportRepository reportRepository;
+
+        @Override
+        public void sendReportByEmail(Long reportId, String to, String subject) {
+            Report report = findReportById(reportId);
+            if (ObjectUtils.isEmpty(report) || !StringUtils.hasLength(report.getReportContent())) {
+                throw new RuntimeException("Report or report content is empty");
+            }
+        }
+
+        private Report findReportById(Long reportId) {
+            return reportRepository.findById(reportId).orElseThrow(() -> new RuntimeException("Report not found"));
+        }
+    }
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+2. Open/Closed Principle (OCP):
+The Open-Closed Principle says that a class should be open for extension and closed to modification. This helps avoid introducing bugs to a working application. 
+In simpler terms, this means that you should be able to add new functionality to a class without changing its existing code.
+
+To implement OCP in Spring Boot, we can use the Template Method pattern. The Template Method pattern allows us to define a basic algorithm in a base class and 
+then allow subclasses to provide specific implementations
+
+    public class ReportGeneratorService {       // Incorrect implementation violating OCP
+        public String generateReport(Report report) {
+            if ("PDF".equals(report.getReportType())) {
+                // ...
+                return "PDF report generated";
+            } else if ("Excel".equals(report.getReportType())) {
+                // ...
+                return "Excel report generated";
+            } else {
+                return "Unsupported report type";
+            }
+        }
+    }
+
+In this incorrect implementation, the generateReport method of ReportService has conditional statements to check the report type and directly generates the report 
+accordingly. This violates the Open-Closed Principle because if you want to add support for a new report type, you would need to modify this class.
+
+    public interface ReportGenerator {
+        String generateReport(Report report);
+    }
+
+    @Component
+    public class PdfReportGenerator implements ReportGenerator {    // for generating PDF reports
+        @Override
+        public String generateReport(Report report) {
+            return String.format("PDF report generated for %s", report.getReportType());
+        }
+    }
+
+    @Component
+    public class ExcelReportGenerator implements ReportGenerator {  // for generating excel reports
+        @Override
+        public String generateReport(Report report) {
+            return String.format("Excel report generated for %s", report.getReportType());
+        }
+    }
+
+    @Service
+    public class ReportGeneratorService {
+        private final Map<String, ReportGenerator> reportGenerators;
+
+        public ReportGeneratorService(List<ReportGenerator> generators) {
+            this.reportGenerators = generators.stream()               // Initialize the map of report generators
+                    .collect(Collectors.toMap(generator -> generator.getClass().getSimpleName(), Function.identity()));
+        }
+
+        public String generateReport(Report report, String reportType) {
+            return reportGenerators.getOrDefault(reportType, unsupportedReportGenerator())
+                    .generateReport(report);
+        }
+
+        private ReportGenerator unsupportedReportGenerator() {
+            return report -> "Unsupported report type";
+        }
+    }
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+3. Liskov’s Substitution Principle (LSP)
+The Liskov Substitution Principle states that if you have a class, you should be able to replace it with a subclass without causing any problems in your program.
+In Spring Boot, we can implement the LSP by using inheritance and polymorphism. 
+    public class Bird {
+        public void fly() {
+        }
+
+        public void swim() {
+        }
+    }
+
+    public class Penguin extends Bird {
+        @Override
+        public void fly() {     // Penguins cannot fly, but we override the fly method and throws Exception
+            throw new UnsupportedOperationException("Penguins cannot fly");
+        }
+    }
+
+Let’s correct this implementation:
+
+    public class Bird {
+    }
+
+    public interface Flyable {
+        void fly();
+    }
+
+    public interface Swimmable {
+        void swim();
+    }
+
+
+    public class Penguin extends Bird implements Swimmable {
+        @Override
+        public void swim() {                 // Penguins cannot fly, therefore we only implement swim interface
+            System.out.println("I can swim");
+        }
+    }
+
+    public class Eagle extends Bird implements Flyable {
+        @Override
+        public void fly() {
+            System.out.println("I can fly");
+        }
+    }
+By separating specific behaviors into interfaces and implementing them in subclasses, we follow Liskov Substitution Principle that lets us switch subclasses without 
+causing any surprising issues.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+4. Interface Segregation Principle (ISP):
+Interface Segregation Principle states that larger interfaces should be split into smaller ones. By doing so, we can ensure that implementing classes only need to be 
+concerned about the methods that are of interest to them. In Spring Boot, we can implement the LSP by using inheritance and polymorphism. 
+
+    public interface Athlete {
+        void compete();
+        void swim();
+        void highJump();
+        void longJump();
+    }
+
+    public class Swimmer implements Athlete {      // Incorrect implementation violating Interface Segregation
+        @Override
+        public void compete() {
+            System.out.println("Athlete started competing");
+        }
+
+        @Override
+        public void swim() {
+            System.out.println("Athlete started swimming");
+        }
+
+        @Override
+        public void highJump() {     // Swimmer dont do high jump
+        }
+
+        @Override
+        public void longJump() {     // Not neccessary for for swimmer
+        }
+    }
+
+Swimmer is forced to provide empty implementations for "highJump" and "longJump", which are irrelevant to his role. Lets correct this implementation:
+
+    public interface Athlete {
+        void compete();
+    }
+
+    public interface JumpingAthlete {
+        void highJump();
+        void longJump();
+    }
+
+    public interface SwimmingAthlete {
+        void swim();
+    }
+
+    public class JohnDoe implements Athlete, SwimmingAthlete {
+        @Override
+        public void compete() {
+            System.out.println("John Doe started competing");
+        }
+
+        @Override
+        public void swim() {
+            System.out.println("John Doe started swimming");
+        }
+    }
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+5. Dependency Inversion Principle (DIP): The Dependency Inversion Principle (DIP) states that 
+1. high level modules should not depend on low level modules; both should depend on abstractions. 
+2. Abstractions should not depend on details, details should depend on abstractions. 
+To implement the DIP in Spring Boot, we can use dependency injection and IOC.
+
+public class BackEndDeveloper {                  |        public class FrontEndDeveloper {
+    public void writeJava() {                    |            public void writeJavascript() {
+    }                                            |            }
+}                                                |        }
+
+public class Project {
+    private BackEndDeveloper backEndDeveloper = new BackEndDeveloper();
+    private FrontEndDeveloper frontEndDeveloper = new FrontEndDeveloper();
+ 
+    public void implement() {
+        backEndDeveloper.writeJava();
+        frontEndDeveloper.writeJavascript();
+    }
+}
+
+Project class is a high level module and it depends on low level modules such as BackEndDeveloper & FrontEndDeveloper. We are actually violating the first part of DIP
+
+Also by the inspecting the implement() method of the Project.class, we realise that the methods writeJava() and writeJavascript() are methods bound to the corresponding 
+classes. Regarding the project scope those are details since in both cases they are forms of development. Thus the 2nd part of the DIP is violated.
+In order to tackle this problem we shall implement and interface called the "Developer" interface.
+
+    public interface Developer {
+        void develop();
+    }
+
+    public class BackEndDeveloper implements Developer {             |        public class FrontEndDeveloper implements Developer {
+        public void develop() {                                      |            public void develop() {
+            writeJava();                                             |                writeJavascript();
+        }                                                            |            }
+                                                                     |
+        public void writeJava() {                                    |            public void writeJavascript() {
+        }                                                            |            }
+    }                                                                |        }
+
+To tackle the 1st problem, we would refactor "Project" class so that it doesnt depend on BackEndDeveloper & FrontEndDeveloper class.
+
+    public class Project {
+        private List<Developer> developers;       // provided by client/main code
+        
+        public Project(List<Developer> developers) {
+            this.developers = developers;
+        }
+    
+        public void implement() {
+            developers.forEach(d->d.develop());
+        }
+    }

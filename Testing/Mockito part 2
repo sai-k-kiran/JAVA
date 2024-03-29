@@ -1,0 +1,547 @@
+MOCKITO WHEN - THEN:
+
+    public class MyList extends AbstractList<String> {
+        @Override
+        public String get(final int index) {
+            return null;
+        }
+
+        @Override
+        public int size() {
+            return 1;
+        }
+    }
+
+Configure simple return behavior for mock:
+
+    MyList listMock = mock(MyList.class);
+    when(listMock.add(anyString())).thenReturn(false);
+
+    assertThat(listMock.add(randomAlphabetic(6))).isFalse();
+
+Configure return behavior for mock in an alternative way:
+
+    MyList listMock = mock(MyList.class);
+    doReturn(false).when(listMock).add(anyString());
+
+    assertThat(listMock.add(randomAlphabetic(6))).isFalse();
+
+Configure mock to throw an exception on a method call:
+
+    MyList listMock = mock(MyList.class);
+    when(listMock.add(anyString())).thenThrow(IllegalStateException.class);
+
+    assertThrows(IllegalStateException.class, () -> listMock.add(randomAlphabetic(6)));
+
+Configure the behavior of a method with void return type — to throw an exception:
+
+    MyList listMock = mock(MyList.class);
+    doThrow(NullPointerException.class).when(listMock).clear();
+
+    assertThrows(NullPointerException.class, () -> listMock.clear());
+    
+Configure the behavior of multiple calls:
+
+    MyList listMock = mock(MyList.class);
+
+    when(listMock.add(anyString()))
+    .thenReturn(false)
+    .thenThrow(IllegalStateException.class);
+
+    assertThrows(IllegalStateException.class, () -> {
+        listMock.add(randomAlphabetic(6));
+        listMock.add(randomAlphabetic(6));
+    });
+
+Configure the behavior of a spy:
+
+    MyList instance = new MyList();
+    MyList spy = spy(instance);
+
+    doThrow(NullPointerException.class).when(spy).size();
+
+    assertThrows(NullPointerException.class, () -> spy.size());
+
+Configure method to call the real, underlying method on a mock:
+
+    MyList listMock = mock(MyList.class);
+    when(listMock.size()).thenCallRealMethod();
+
+    assertThat(listMock).hasSize(1);
+
+Configure mock method call with custom Answer:
+
+    MyList listMock = mock(MyList.class);
+    doAnswer(invocation -> "Always the same").when(listMock).get(anyInt());
+
+    String element = listMock.get(1);
+    assertThat(element).isEqualTo("Always the same");
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+MOCKITO VERIFY:
+
+    public class MyList extends AbstractList<String> {
+        @Override
+        public String get(final int index) {
+            return null;
+        }
+        
+        @Override
+        public int size() {
+            return 1;
+        }
+    }
+
+Verify simple invocation on mock:
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.size();
+
+    verify(mockedList).size();   // verifies that "size()" method on mockedList is called
+
+Verify the number of interactions with mock:
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.size();
+    verify(mockedList, times(1)).size();  // verifies that "size()" has been called 1 time
+
+Verify no interaction with the whole mock occurred:
+
+    List<String> mockedList = mock(MyList.class);
+    verifyNoInteractions(mockedList);
+
+Verify an interaction has not occurred:
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.size();
+
+    verify(mockedList, never()).clear(); // verify that clear() method was never called
+
+Verify there are no unexpected interactions — this should fail: 
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.size();
+    mockedList.clear();
+
+    verify(mockedList).size(); // we verified that "size()" method was called. clear() method is not verified 
+    assertThrows(NoInteractionsWanted.class, () -> verifyNoMoreInteractions(mockedList));
+
+Verify the order of interactions:
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.size();
+    mockedList.add("a parameter");
+    mockedList.clear();
+
+    InOrder inOrder = Mockito.inOrder(mockedList);
+    inOrder.verify(mockedList).size();
+    inOrder.verify(mockedList).add("a parameter");
+    inOrder.verify(mockedList).clear();
+
+Verify an interaction has occurred at least a certain number of times:
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.clear();
+    mockedList.clear();
+    mockedList.clear();
+
+    verify(mockedList, atLeast(1)).clear();
+    verify(mockedList, atMost(10)).clear();
+
+Verify interaction with the exact argument:
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.add("test");
+
+    verify(mockedList).add("test");
+
+Verify interaction with flexible/any argument:
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.add("test");
+
+    verify(mockedList).add(anyString());
+
+Verify interaction using argument capture:
+
+    List<String> mockedList = mock(MyList.class);
+    mockedList.addAll(Lists.<String> newArrayList("someElement"));
+
+    ArgumentCaptor<List<String>> argumentCaptor = ArgumentCaptor.forClass(List.class);
+    verify(mockedList).addAll(argumentCaptor.capture());
+
+    List<String> capturedArgument = argumentCaptor.getValue();
+    assertThat(capturedArgument).contains("someElement");
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Mocking void methods:
+Void methods can be used with Mockito’s doNothing(), doThrow(), and doAnswer() methods, making mocking and verifying intuitive:
+
+    @Test
+    public void whenAddCalled_thenVerified() {
+        MyList myList = mock(MyList.class);
+        doNothing().when(myList).add(isA(Integer.class), isA(String.class));   // this line is unnecessary coz doNothing() is default behavior for void methods.
+        myList.add(0, "");
+    
+        verify(myList, times(1)).add(0, "");
+    }
+
+doThrow() generates an exception:
+
+    @Test
+    void givenNull_whenAddCalled_thenThrowsException() {
+        MyList myList = mock(MyList.class);
+        
+        assertThrows(Exception.class, () -> {
+            doThrow().when(myList).add(isA(Integer.class), isNull());
+        });
+
+        myList.add(0, null);
+    }
+
+One reason to override the default behavior with doNothing() is to capture arguments. In the example above, we used the verify() method to check the arguments 
+passed to add(). However, we may need to capture the arguments and do something more with them.
+
+    @Test
+    void givenArgumentCaptor_whenAddCalled_thenValueCaptured() {
+        MyList myList = mock(MyList.class);
+        
+        ArgumentCaptor<String> valueCapture = ArgumentCaptor.forClass(String.class);
+        doNothing().when(myList).add(any(Integer.class), valueCapture.capture());
+        
+        myList.add(0, "captured");
+        
+        assertEquals("captured", valueCapture.getValue());
+    }
+
+A method may perform more complex behavior than merely adding or setting value. For these cases, we can use Mockito’s Answer to add the behavior we need:
+
+    @Test
+    void givenDoAnswer_whenAddCalled_thenAnswered() {
+        MyList myList = mock(MyList.class);
+        
+        doAnswer(invocation -> {
+            Object arg0 = invocation.getArgument(0);
+            Object arg1 = invocation.getArgument(1);
+            
+            assertEquals(3, arg0);
+            assertEquals("answer me", arg1);
+            return null;
+        }).when(myList).add(any(Integer.class), any(String.class));
+        
+        myList.add(3, "answer me");
+    }
+
+Partial mocks are an option too. Mockito’s doCallRealMethod() can be used for void methods:
+
+    @Test
+    void givenDoCallRealMethod_whenAddCalled_thenRealMethodCalled() {
+        MyList myList = mock(MyList.class);
+        
+        doCallRealMethod().when(myList).add(any(Integer.class), any(String.class));
+        myList.add(1, "real");
+        
+        verify(myList, times(1)).add(1, "real");
+    }
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Mock Final Classes and Methods:
+
+    public class MyList extends AbstractList<String> {      --> Mock a final method
+        final public int finalMethod() {
+            return 0;
+        }
+    }
+    public final class FinalList extends MyList {
+
+        @Override
+        public int size() {
+            return 1;
+        }
+    }
+
+    @Test
+    public void whenMockFinalMethod_thenMockWorks() {
+        MyList mock = mock(MyList.class);
+        when(mock.finalMethod()).thenReturn(1);
+
+        assertThat(mock.finalMethod()).isNotZero();
+    }
+
+    @Test  
+    public void whenMockFinalClass_thenMockWorks() {         --> Mock a final class
+
+        FinalList mock = mock(FinalList.class);
+        when(mock.size()).thenReturn(2);
+
+        assertThat(mock.size()).isNotEqualTo(1);
+    }
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+LAZY VERIFICATION USING MOCKITO 2:
+
+The default behavior of Mockito is to stop at the first failure i.e. eagerly – the approach is also known as fail-fast. Sometimes we might need to execute 
+and report all verifications – regardless of previous failures.
+
+VerificationCollector is a JUnit rule which collects all verifications in test methods. They’re executed and reported at the end of the test if there are failures:
+
+public class LazyVerificationTest {
+ 
+    @Rule
+    public VerificationCollector verificationCollector = MockitoJUnit.collector();
+
+    @Test
+    public void testLazyVerification() throws Exception {
+        List mockList = mock(ArrayList.class);
+        
+        verify(mockList).add("one");
+        verify(mockList).clear();
+    }
+}
+
+When this test is executed, failures of both verifications will be reported:
+    org.mockito.exceptions.base.MockitoAssertionError: There were multiple verification failures:
+
+Without VerificationCollector rule, only the first verification gets reported
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+TESTING CALLBACKS:
+
+A callback is a piece of code that is passed as an argument to a method, which is expected to call back (execute) the argument at a given time.
+This execution may be immediate as in a synchronous callback, but more typically it might happen at a later time as in an asynchronous callback.
+A common scenario for the use of Callbacks is during service interactions when we need to process the response from a service call.
+
+    public interface Service {
+        void doAction(String request, Callback<Response> callback);
+    }
+    public interface Callback<T> {
+        void reply(T response);
+    }
+
+A straightforward service example to demonstrate how to pass and invoke the callback:
+
+    public void doAction() {
+        service.doAction("our-request", new Callback<Response>() {
+            @Override
+            public void reply(Response response) {
+                handleResponse(response);
+            }
+        });
+
+        // service.doAction("our-request", response -> handleResponse(response));  OR LIKE THIS
+    }
+    private void handleResponse(Response response) {
+        if (response.isValid()) {
+            response.setData(new Data("Successful data response"));
+        }
+    }
+
+Using ArgumentCaptor:
+Grab the Callback object using an ArgumentCaptor:
+
+    @Test
+    public void givenServiceWithValidResponse_whenCallbackReceived_thenProcessed() {
+        ActionHandler handler = new ActionHandler(service);
+        handler.doAction();
+
+        verify(service).doAction(anyString(), callbackCaptor.capture());
+
+        Callback<Response> callback = callbackCaptor.getValue();
+        Response response = new Response();
+        callback.reply(response);
+
+        String expectedMessage = "Successful data response";
+        Data data = response.getData();
+
+        assertEquals("Should receive a successful message: ", expectedMessage, data.getMessage());
+    }
+
+In this example, we first create an ActionHandler before calling the doAction method of this handler. This is simply a wrapper to our Simple Service doAction
+method call which is where we invoke our callback.
+
+Next, we verify that doAction was called on our mock service instance passing anyString() as the first argument and callbackCaptor.capture() as the second, 
+which is where we capture the Callback object. The getValue()  method can then be used to return the captured value of the argument.
+
+Now that we’ve got the Callback object, we create a Response object which is valid by default before we call the reply method directly and assert that the 
+response data has the correct value.
+
+Using doAnswer() method:
+
+    @Test
+    public void givenServiceWithInvalidResponse_whenCallbackReceived_thenNotProcessed() {
+        Response response = new Response();
+        response.setIsValid(false);
+
+        doAnswer((Answer<Void>) invocation -> {
+            Callback<Response> callback = invocation.getArgument(1);
+            callback.reply(response);
+
+            Data data = response.getData();
+            assertNull("No data in invalid response: ", data);
+            return null;
+        }).when(service)
+            .doAction(anyString(), any(Callback.class));
+
+        ActionHandler handler = new ActionHandler(service);
+        handler.doAction();
+    }
+
+And, in our second example, we first create an invalid Response object which will be used later in the test.
+
+Next, we set up the Answer on our mock service so that when doAction is called, we intercept the invocation and grab the method arguments using 
+invocation.getArgument(1) to get the Callback argument. The last step is to create the ActionHandler and call doAction which causes the Answer to be invoked.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+MOCKING STATIC METHODS:
+Previous to version 3.4.0 of Mockito, it wasn’t possible to mock static methods directly — only with the help of PowerMockito.
+
+Generally speaking, some might say that when writing clean object-orientated code, we shouldn’t need to mock static classes. This could typically hint at 
+a design issue or code smell in our application.
+
+Why? First, a class depending on a static method has tight coupling, and second, it nearly always leads to code that is difficult to test. Ideally, a class 
+should not be responsible for obtaining its dependencies, and if possible, they should be externally injected.
+
+    public class StaticUtils {
+        private StaticUtils() {}
+
+        public static List<Integer> range(int start, int end) {
+            return IntStream.range(start, end)
+            .boxed()
+            .collect(Collectors.toList());
+        }
+
+        public static String name() {
+            return "Baeldung";
+        }
+    }
+
+Mocking a No Argument Static Method:
+
+    @Test
+    void givenStaticMethodWithNoArgs_whenMocked_thenReturnsMockSuccessfully() {
+        assertThat(StaticUtils.name()).isEqualTo("Baeldung");
+
+        try (MockedStatic<StaticUtils> utilities = Mockito.mockStatic(StaticUtils.class)) {
+            utilities.when(StaticUtils::name).thenReturn("Eugen");
+            assertThat(StaticUtils.name()).isEqualTo("Eugen");
+        }
+
+        assertThat(StaticUtils.name()).isEqualTo("Baeldung");
+    }
+
+We can use the Mockito.mockStatic(Class<T> classToMock) method to mock invocations to static method calls. This method returns a MockedStatic object for our 
+type, which is a scoped mock object.
+
+Therefore, in our unit test above, the "utilities" variable represents a mock with a thread-local explicit scope. It’s important to note that scoped mocks 
+must be closed by the entity that activates the mock. This is why we define our mock within a "try-with-resources" construct so that the mock is closed 
+automatically when we finish with our scoped block.
+
+This is a particularly nice feature since it assures that our static mock remains temporary. As we know, if we’re playing around with static method calls 
+during our test runs, this will likely lead to adverse effects on our test results due to the concurrent and sequential nature of running tests.
+
+On top of this, another nice side effect is that our tests will still run quite fast since Mockito doesn’t need to replace the classloader for every test.
+In our example, we reiterate this point by checking, before and after our scoped block, that our static method name returns a real value.
+
+Mocking a Static Method With Arguments
+
+    @Test
+    void givenStaticMethodWithArgs_whenMocked_thenReturnsMockSuccessfully() {
+        assertThat(StaticUtils.range(2, 6)).containsExactly(2, 3, 4, 5);
+
+        try (MockedStatic<StaticUtils> utilities = Mockito.mockStatic(StaticUtils.class)) {
+            utilities.when(() -> StaticUtils.range(2, 6)).thenReturn(Arrays.asList(10, 11, 12));  // same approach, but lambda expression
+
+            assertThat(StaticUtils.range(2, 6)).containsExactly(10, 11, 12);
+        }
+
+        assertThat(StaticUtils.range(2, 6)).containsExactly(2, 3, 4, 5);
+    }
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+MOCKITO - USING SPIES:
+The API is Mockito.spy() to spy on a real object.
+This will allow us to call all the normal methods of the object while still tracking every interaction, just as we would with a mock.
+
+    @Spy
+    List<String> spyList = new ArrayList<String>();
+
+    @Test
+    void givenUsingSpyMethod_whenSpyingOnList_thenCorrect() {
+        List<String> list = new ArrayList<String>();   // if we used @Spy annotation
+        List<String> spyList = spy(list);              // then these 2 lines are unnecesaary
+
+        spyList.add("one");  // calling real add() method, unlike mockedList.add("one");
+        spyList.add("two");
+
+        verify(spyList).add("one"); 
+        verify(spyList).add("two");
+
+        assertThat(spyList).hasSize(2);
+    }
+
+Note how the real method add() is actually called and how the size of spyList becomes 2.
+To enable Mockito annotations (such as @Spy, @Mock, … ), we need to use @ExtendWith(MockitoExtension.class) that initializes mocks and handles strict stubbings.
+
+Let’s see how to stub a Spy. We can configure/override the behavior of a method using the same syntax we would use with a mock.
+Here we’ll use doReturn() to override the size() method:
+
+    @Test
+    void givenASpy_whenStubbingTheBehaviour_thenCorrect() {
+        List<String> list = new ArrayList<String>();
+        List<String> spyList = spy(list);
+
+        assertEquals(0, spyList.size());
+
+        doReturn(100).when(spyList).size();
+        assertThat(spyList).hasSize(100);
+    }
+
+Mock vs Spy in Mockito:
+When Mockito creates a mock, it does so from the Class of a Type, not from an actual instance. The mock simply creates a bare-bones shell instance of the Class, 
+entirely instrumented to track interactions with it.
+
+On the other hand, the spy will wrap an existing instance. It will still behave in the same way as the normal instance; the only difference is that it will also 
+be instrumented to track all the interactions with it.
+
+    @Test
+    void whenCreateMock_thenCreated() {
+        List mockedList = mock(ArrayList.class);
+
+        mockedList.add("one");
+        verify(mockedList).add("one");
+
+        assertThat(mockedList).hasSize(0);
+    }
+As we can see, adding an element into the mocked list doesn’t actually add anything; it just calls the method with no other side effects.
+
+A spy, on the other hand, will behave differently; it will actually call the real implementation of the add method and add the element to the underlying list:
+
+    @Test
+    void whenCreateSpy_thenCreate() {
+        List spyList = Mockito.spy(new ArrayList());
+
+        spyList.add("one");
+        Mockito.verify(spyList).add("one");
+
+        assertThat(spyList).hasSize(1);
+    }
+
+Understanding the Mockito NotAMockException:
+This exception is one of the common exceptions we will likely encounter when misusing mocks or spies.
+
+    List<String> list = new ArrayList<String>();
+    doReturn(100).when(list).size();
+
+    OP -->  org.mockito.exceptions.misusing.NotAMockException: 
+            Argument passed to when() is not a mock!
+            Example of correct stubbing:
+                doThrow(new RuntimeException()).when(mock).someMethod();
+
+Thankfully, it is quite clear from the Mockito error message what the problem is here. In our example, the "list" object is not a mock. The Mockito 
+when() method expects a mock or spy object as the argument.
+
+As we can also see, the Exception message even describes what a correct invocation should look like.
+
+    final List<String> spyList = spy(new ArrayList<>());
+    assertThatNoException().isThrownBy(() -> doReturn(100).when(spyList).size());
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+

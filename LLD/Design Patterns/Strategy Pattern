@@ -1,0 +1,130 @@
+Strategy patterns defines a family of algorithms, encapsulates each one and makes them interchangeable. Strategy lets the algorithm vary indepedently from
+the clients that use it.
+
+This pattern suggests that we can plug different algorithms(or implementations) into our client. If we change the algorithm in future, client will work as intended
+without any change in itself.
+
+In my whiteboard project, I have implemented DAO layer using spring JDBC & spring JPA. I am using spring JDBC implementation in my service class using
+"@Qualifier" annotation. If I want, I can use spring JPA implementation of DAO layer by just the switching in my service class.
+
+Another ex: If we create multiple sorting strategies to sort a collection(ArrayList, set etc), we can inject that sorting strategy without changing 
+the collection in any way.
+
+EX:
+We created a navigation app for travellers. It has a feature that a user can enter a destination and the app will display the route to reach that destination.
+The first verision is created for travellers using cars, later routes & algorithms for walkers and trekkers was added. Then, routes & algorithm for public transport
+was added. Later we have to add more according to business requirements.
+
+We cant add and refactor whole source code for every route we have add. This will become messy and un maintainable after some time.
+
+We can use strategy pattern in this case. The Strategy pattern suggests that you take a class that does something specific in a lot of different ways and extract all of these algorithms into separate classes called "strategies".
+
+The context isn’t responsible for selecting an appropriate algorithm for the job. Instead, the client passes the desired strategy to the context. In fact, the context doesn’t know much about strategies. It works with all strategies through the same generic interface, which only exposes a single method for triggering the algorithm encapsulated within the selected strategy.
+
+In our app, we have a context which gets different strategies(implementations). 
+The Context maintains a reference to one of the concrete strategies and communicates with this object only via the strategy interface.
+
+The Strategy interface is common to all concrete strategies. It declares a method the context uses to execute a strategy.
+
+Concrete Strategies implement different variations of an algorithm the context uses.
+
+The context calls the execution method on the linked strategy object each time it needs to run the algorithm. The context doesn’t know what type of strategy it works with or how the algorithm is executed.
+
+The Client creates a specific strategy object and passes it to the context. The context exposes a setter which lets clients replace the strategy associated with the context at runtime.
+
+str = new SomeStrategy();
+context.setStrategy(str);
+context.doSomething();
+
+other = new OtherStrategy();
+context.setStrategy(other);
+context.doSomething();
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+interface Strategy{
+    void execute(int a, int b);
+}
+
+class ConcreteStrategySubtract implements Strategy
+    method execute(a, b) is
+        return a - b
+
+class ConcreteStrategyMultiply implements Strategy
+    method execute(a, b) is
+        return a * b
+
+class Context{
+    private Strategy strategy;
+
+    public void setStrategy(Strategy strategy){
+        this.strategy = strategy;
+    }
+
+    public void executeStrategy(int a, int b){
+        return strategy.execute(a, b);
+    }
+}
+
+class ExampleApplication{
+    Context context;
+    Action action;
+
+    public ExampleApplication(Context context, Action action){
+        this.context = context;
+        this.action = action;
+    }
+
+    if(action == addition){
+        context.setStrategy(new ConcreteStrategyAdd());
+    }
+    else if(action == subtraction){
+        context.setStrategy(new ConcreteStrategySubtract());
+    }
+    else if....
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+APPLICABILITY:
+
+- Use the Strategy pattern when you want to use different variants of an algorithm within an object and be able to switch from one algorithm to another during runtime.
+
+The Strategy pattern lets you indirectly alter the object’s behavior at runtime by associating it with different sub-objects which can perform specific sub-tasks in different ways.
+
+- Use the Strategy when you have a lot of similar classes that only differ in the way they execute some behavior.
+
+The Strategy pattern lets you extract the varying behavior into a separate class hierarchy and combine the original classes into one, thereby reducing duplicate code.
+
+-  Use the pattern to isolate the business logic of a class from the implementation details of algorithms that may not be as important in the context of that logic.
+
+The Strategy pattern lets you isolate the code, internal data, and dependencies of various algorithms from the rest of the code. Various clients get a simple interface to execute the algorithms and switch them at runtime.
+
+-  Use the pattern when your class has a massive conditional statement that switches between different variants of the same algorithm.
+
+The Strategy pattern lets you do away with such a conditional by extracting all algorithms into separate classes, all of which implement the same interface. The original object delegates execution to one of these objects, instead of implementing all variants of the algorithm.
+
+HOW TO IMPLEMENT IT:
+
+1. In the context class, identify an algorithm that’s prone to frequent changes. It may also be a massive conditional that selects and executes a variant of the same algorithm at runtime.
+
+2. Declare the strategy interface common to all variants of the algorithm.
+
+3. One by one, extract all algorithms into their own classes. They should all implement the strategy interface.
+
+4. In the context class, add a field for storing a reference to a strategy object. Provide a setter for replacing values of that field. The context should work with the strategy object only via the strategy interface. The context may define an interface which lets the strategy access its data.
+
+5. Clients of the context must associate it with a suitable strategy that matches the way they expect the context to perform its primary job.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+RELATIONS WITH OTHER PATTERNS:
+
+- Bridge, State, Strategy (and to some degree Adapter) have very similar structures. Indeed, all of these patterns are based on composition, which is delegating work to other objects. However, they all solve different problems. A pattern isn’t just a recipe for structuring your code in a specific way. It can also communicate to other developers the problem the pattern solves.
+
+- Command and Strategy may look similar because you can use both to parameterize an object with some action. However, they have very different intents.
+
+You can use Command to convert any operation into an object. The operation’s parameters become fields of that object. The conversion lets you defer execution of the operation, queue it, store the history of commands, send commands to remote services, etc.
+
+On the other hand, Strategy usually describes different ways of doing the same thing, letting you swap these algorithms within a single context class.
+
+- Template Method is based on inheritance: it lets you alter parts of an algorithm by extending those parts in subclasses. Strategy is based on composition: you can alter parts of the object’s behavior by supplying it with different strategies that correspond to that behavior. Template Method works at the class level, so it’s static. Strategy works on the object level, letting you switch behaviors at runtime.
+
+- State can be considered as an extension of Strategy. Both patterns are based on composition: they change the behavior of the context by delegating some work to helper objects. Strategy makes these objects completely independent and unaware of each other. However, State doesn’t restrict dependencies between concrete states, letting them alter the state of the context at will.

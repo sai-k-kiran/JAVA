@@ -1,0 +1,193 @@
+@RestControllerAdvice      // Miguel Angel Perez Diaz on Medium
+
+The @RestControllerAdvice annotation is a specialized form of the @Component annotation, which enables automatic detection through classpath scanning. It serves as 
+an interceptor that envelops the operations within our Controllers, allowing us to apply common logic to them.
+
+The methods within @RestControllerAdvice (marked with @ExceptionHandler) are accessible globally to multiple @Controller components, and their purpose is to catch 
+exceptions and transform them into HTTP responses
+The @ExceptionHandler annotation specifies the type of Exception that should be managed. The method will receive the exception instance and the request as method 
+arguments.
+
+By combining these two annotations, we achieve the following:
+
+    - Control over the response content and status code.
+    - The ability to handle multiple exceptions within a single method.
+
+@ControllerAdvice: This annotation is well-suited for applications that primarily generate traditional HTML views. When your application is focused on rendering 
+web pages, @ControllerAdvice is the appropriate choice. It excels at handling exceptions within the context of web views and provides a means to customize error 
+responses in HTML format.
+
+@RestControllerAdvice: In contrast, @RestControllerAdvice finds its niche in applications that predominantly serve data in JSON, XML, or other structured formats. 
+This is especially common in RESTful web services, where the primary task is delivering data to clients. @RestControllerAdvice is designed to manage exceptions and 
+tailor error responses specifically for these data-centric scenarios.
+
+@RestControllerAdvice is a composed annotation that is annotated with both @ControllerAdvice and @ResponseBody, which essentially means @ExceptionHandler methods 
+are rendered to the response body through message conversion (versus view resolution or template rendering), so @ControllerAdvice can be used even for REST web 
+services as well, but you need to additionally use @ResponseBody.
+
+Advantages of Using @RestControllerAdvice:
+
+1. Streamlined Error Responses: @RestControllerAdvice empowers developers to craft consistent and structured error responses in formats like JSON or XML.
+    This standardization enhances communication between the application and its clients, making it easier to interpret and handle errors programmatically.
+
+2.  Precision in RESTful Environments: RESTful services often require pinpoint precision in "exception handling in Spring." With @RestControllerAdvice, you 
+can tailor error messages to meet the specific needs of your RESTful API clients
+
+3. Simplified Exception Handling: Exception handling becomes more straightforward with @RestControllerAdvice. By consolidating error-handling logic in one 
+place, it simplifies code maintenance and reduces redundancy, resulting in cleaner and more maintainable codebases.
+
+4. Focused Approach: @RestControllerAdvice is well-suited to applications where the primary focus is delivering data
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+@RestController
+public class ClientController {
+    private final ClientService clientService;
+
+    @PostMapping("api/v1/clients")
+    public ClientDTO create(@RequestBody ClientDTO clientDTO) {
+        try {
+            return this.clientService.create(clientDTO);
+        } catch (ClientAlreadyExistsException ex) {
+            throw new CustomException1(ex.getMessage());
+
+        } catch (EmailBadFormatException ex) {
+            throw new CustomException2(ex.getMessage());
+        }
+    }
+}
+
+The above method implements basic try-catch block. complexity of the controller grows as the number of conditions in our application grows, so the readability of 
+our code is affected.
+
+Initially we are going to define our "abstract" exception that must inherit from "RuntimeException" and where we are going to define the fields that we want to 
+collect in our exceptions
+
+public class AbstractException extends RuntimeException {
+    private String message;
+
+    private Map<String, String> details;
+
+}
+
+public class EntityNotFoundException extends AbstractException {
+    
+    public EntityNotFoundException(String message, Map<String, String> details) {
+        super(message, details);
+    }
+}
+
+public class InvalidCallException extends AbstractException {
+
+    public InvalidCallException(String message, Map<String, String> details) {
+        super(message, details);
+    }
+}
+
+Finally we define our global exception handler together with the error DTO that we want to send to the client
+
+public class ErrorMessageDTO implements Serializable {
+    private String message;
+
+    private Instant date;
+
+    private Map<String, String> details;
+}
+
+@RestControllerAdvice
+public class GlobalExceptionResponseHandler {
+    
+    @ExceptionHandler(value = {InvalidCallException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorMessageDTO mapInvalidCallException(InvalidCallException ex, WebRequest request) {
+
+        return ErrorMessageDTO.builder()
+                .message(ex.getMessage())
+                .date(Instant.now())
+                .details(ex.getDetails())
+                .build();
+    }
+
+    @ExceptionHandler(value = {EntityNotFoundException.class})
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorMessageDTO mapNotFoundException(EntityNotFoundException ex, WebRequest request) {
+
+        return ErrorMessageDTO.builder()
+                .message(ex.getMessage())
+                .date(Instant.now())
+                .details(ex.getDetails())
+                .build();
+    }
+}
+
+public enum ExceptionMessagesEnum {  
+    CLIENT_NOT_FOUND("Client not found"),
+    
+    EMAIL_BAD_FORMAT("Email has bad format"),
+    
+    CLIENT_ALREADY_EXISTS("Client already exists");
+    
+    private final String description;
+}
+
+In our service :
+public ClientDTO find(Long id) {
+    return this.clientRepository.findById(id)
+            .map(this.mapper::asDto)
+            .orElseThrow(() -> new EntityNotFoundException(CLIENT_NOT_FOUND.getDescription(), Map.of("ID", String.valueOf(id))));
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+To catch and handle exceptions at one point, we can create a "DefaultExceptionHandler" class and implement methods for each type of Exception.
+
+Suppose our application throws some in-built exceptions like BadCredentialsException or custom Exception like "ResourceNotFound" exception. We can create methods in
+DefaultExceptionHandler class for these exceptions to customize how we serve our exceptions to the client. 
+
+To customize our error responses, we can create "APIerror" class which contains path, message, status code, and time.
+
+    public record APIError (
+            String path,
+            String message,
+            int statusCode,
+            LocalDateTime localDateTime
+    ){ }
+
+In DefaultExceptionHandler  -->
+
+@RestControllerAdvice
+public class DefaultExceptionHandler{                     // DefaultExceptionHandler.java
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<APIerror> handleException(BadCredentialsException e,
+                                                    HttpServletRequest request,
+                                                    HttpServletResponse response){
+        APIError error = new APIError(
+            request.getRequestURI(),
+            e.getMessage(),
+            HttpStatus.UNAUTHORIZED.value(),    // 401
+            LocalDateTime.now()
+        );
+        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(ResourceNotFound.class)                                       // custom error class
+    public ResponseEntity<APIerror> handleException(ResourceNotFound e,
+                                                    HttpServletRequest request,
+                                                    HttpServletResponse response){
+        APIError error = new APIError(
+            request.getRequestURI(),
+            e.getMessage(),
+            HttpStatus.NOT_FOUND.value(),    // 404
+            LocalDateTime.now()
+        );
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+}
+
+@ResponseStatus(code = HttpStatus.NOT_FOUND)                      // Custom error class in ResourceNotFound.java
+public class ResourceNotFound extends RuntimeException{
+    public ResourceNotFound(String message){
+        super(message);
+    }
+}
+
+Whenever an error occurs of ResourceNotFound or BadCredentialsException type, the error will contain the fields from APIError class in the browser console.

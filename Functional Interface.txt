@@ -1,0 +1,505 @@
+Functional interfaces are interfaces with only 1 abstract methods and can have many default and static methods. Lambda expressions can be used only for 
+functional interfaces. 
+
+@FunctionalInterface
+public interface Foo {
+    String method(String string);
+}
+
+public String add(String string, Foo foo) {
+    return foo.method(string);
+}
+
+To execute it, we would write:
+Foo foo = parameter -> parameter + " from lambda";
+String result = useFoo.add("Message ", foo);
+
+Foo is nothing more than a function that accepts one argument and produces a result. Java 8 already provides such an interface in Function<T,R>.
+
+Now we can remove interface Foo completely and change our code to:
+
+public String add(String string, Function<String, String> fn) {
+    return fn.apply(string);
+}
+
+Function<String, String> fn = parameter -> parameter + " from lambda";
+String result = useFoo.add("Message ", fn);
+
+Extending different functional interfaces with the same default method can be problematic. Suppose there are 2 interfaces "Bar" & "Baz" which both have 
+default method "defaultCommon()". If our interface extend both "Bar" & "Baz", then compiler will give error that the "defaultCommon()" is common for in
+both parent interfaces. We can override "defaultCommon()" in the child interface by implementing in a new way or by reusing implementation from 
+the parent interface.
+
+public interface FooExtended extends Baz, Bar {
+    @Override
+    default String defaultCommon() {
+        return Bar.super.defaultCommon();   // reusing "defaultCommon()" method of Bar interface.
+    }
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Avoid Overloading Methods With Functional Interfaces as Parameters.
+
+public interface Processor {
+    String process(Callable<String> c) throws Exception;
+    String process(Supplier<String> s);
+}
+
+public class ProcessorImpl implements Processor {
+    @Override
+    public String process(Callable<String> c) throws Exception {
+    }
+
+    @Override
+    public String process(Supplier<String> s) {
+    }
+}
+
+String result = processor.process(() -> "abc");      // ERROR, reference to process is ambiguous
+
+Either use different names or type cast the "process" method (not preferred)
+String result = processor.process((Supplier<String>) () -> "abc");
+
+When we use an inner class, it creates a new scope. We can hide local variables from the enclosing scope by instantiating new local variables with the 
+same names. We can also use the keyword "this" inside our inner class as a reference to its instance.
+
+Lambda expressions, however, work with enclosing scope. We can’t hide variables from the enclosing scope inside the lambda’s body. In this case, the keyword 
+this is a reference to an enclosing instance.
+
+For example, in the class UseFoo, we have an instance variable value:
+private String value = "Enclosing scope value";
+
+Then in some method of this class:
+
+public String scopeExperiment() {
+    Foo fooIC = new Foo() {
+        String value = "Inner class value";
+
+        @Override
+        public String method(String string) {
+            return this.value;
+        }
+    };
+    String resultIC = fooIC.method("");
+
+    Foo fooLambda = parameter -> {
+        String value = "Lambda value";
+        return this.value;
+    };
+    String resultLambda = fooLambda.method("");
+
+    return "Results: resultIC = " + resultIC + ", resultLambda = " + resultLambda;
+} 
+resultIC = "Inner class value", resultLambda = "Enclosing scope value"
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+(a, b) -> a.toLowerCase() + b.toLowerCase();     --> Use this
+
+(String a, String b) -> a.toLowerCase() + b.toLowerCase();       --> Instead of this
+
+String::toLowerCase;      --> Use this
+
+a -> a.toLowerCase();         --> Instead of this
+
+PRIMITIVE FUNCTION SPECIALIZATIONS:
+
+Since a primitive type can’t be a generic type argument, there are versions of the Function interface for the most used primitive types double, int, long, 
+and their combinations in argument and return types:
+
+- IntFunction, LongFunction, DoubleFunction: arguments are of specified type, return type is parameterized
+
+- ToIntFunction, ToLongFunction, ToDoubleFunction: return type is of specified type, arguments are parameterized
+
+- DoubleToIntFunction, DoubleToLongFunction, IntToDoubleFunction, IntToLongFunction, LongToIntFunction, LongToDoubleFunction: having both argument and 
+  return type defined as primitive types, as specified by their names
+
+To convert short to byte 
+
+@FunctionalInterface
+public interface ShortToByteFunction {
+    byte applyAsByte(short s);
+}
+
+public byte[] transformArray(short[] array, ShortToByteFunction function){
+    byte[] arr = new byte[array.length];
+
+    for(int i = 0; i < array.lengt; i++){
+        arr[i] = function.applyAsByte(array[i]);
+    }
+    return arr;
+}
+
+short[] array = {(short) 1, (short) 2, (short) 3};
+byte[] arr = transformArray(array, elem -> (byte) elem);
+
+TWO-ARITY FUNCTIONS:
+
+To define lambdas with two arguments, we have to use additional interfaces: BiFunction, ToDoubleBiFunction, ToIntBiFunction, and ToLongBiFunction.
+BiFunction has both arguments and a return type generified, while ToDoubleBiFunction and others allow us to return a primitive value.
+
+One of the ex of using this interface in the standard API is in the Map.replaceAll method which replaces all values in a map with some computed value.
+
+map.replaceAll((key, value) -> key.equals("Freddy") ? value : value + 10000);
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+1. CONSUMER INTERFACE:
+
+Consumer interface is used to process the elems passed to it as a param. They are expected to operated via side effects.
+It represents a function which takes in one argument and produces a result. However these kind of functions don’t return any value.
+This functional interface which takes in one generic namely:- 
+
+T: denotes the type of the input argument to the operation --> Consumer<T>
+
+The lambda expression assigned to an object of Consumer type is used to define its accept() which eventually applies the given operation on its 
+argument. Consumers are useful when it not needed to return any value as they are expected to operate via side-effects. 
+
+Consumer interface consists of 1 method --> "accept()" and the method takes 1 param. So the method is "accept(T t)"
+
+EX:
+
+List<String> names = Arrays.asList("John", "Freddy", "Samuel");
+names.forEach(name -> System.out.println("Hello, " + name));
+
+Consumer<Integer> display = (a) -> System.out.print(a);
+display.accept(10);        // 10
+
+List<Integer> list = new ArrayList<Integer>();
+list.add(2);
+list.add(1);
+list.add(3);
+
+Consumer<List<Integer>> modify = (list) -> {
+    for(int i = 0; i < list.size(); i++){
+        list.set(i, 2* list.get(i));
+    }
+}
+
+modify.accept(list);   // modifies the list elems
+
+Consumer<List<Integer>>
+            dispList = list -> list.stream().forEach(a -> System.out.print(a + " "));   
+        
+dispList.accept(list);    // prints 4 2 6
+
+andThen():
+
+"andThen()" is a default method in Consumer interface. It returns a composed consumer wherein the parameterized Consumer will be executed after the first one.
+If evaluation of either function throws an error, it is relayed to the caller of the composed operation.
+
+default Consumer <T> andThen(Consumer<? super T> after)
+
+The parameter "after" is Consumer type. First the "accept()" method will run and then the "andThen()" method will run.
+
+Ex: Consider the same list in above example code.
+
+1. modify.andThen(dispList).accept(list);        // we are passing the Consumer "dispList" as "after" param to "andThen()"
+
+    The accept() method modifies the list and the "andThen()" method prints the modified elems of the list.
+
+2. dispList.andThen(modify).accept(list);
+    dispList will first print the list elems using "accept()" method. The "andThen()" method will have to modify the list elems which will throw an error.
+    Because, in the loop inside modify, we are doing "2 * list.get(i)". The list.get(i) functions will throw "IndexOutOfBoundsException" exp as the
+    list elems are 2, 4 and 6 and list.get(4) is out of bound.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+2. BiCONSUMER INTERFACE:
+
+There are also specialized versions of the Consumer — DoubleConsumer, IntConsumer and LongConsumer — that receive primitive values as arguments. 
+More interesting is the BiConsumer interface. One of its use cases is iterating through the entries of a map:
+
+Map<String, Integer> ages = new HashMap<>();
+ages.put("John", 25);
+ages.put("Freddy", 24);
+ages.put("Samuel", 30);
+
+ages.forEach((name, age) -> System.out.println(name + " is " + age + " years old"));
+
+It represents a function that takes in two arguments and produces a result. However, these kinds of functions doesn’t return any value.
+
+This functional interface takes in two generics, namely:- 
+    T: denotes the type of the first input argument to the operation
+    U: denotes the type of the second input argument to the operation
+
+The lambda expression assigned to object of BiConsumer type is used to define its "accept() "which eventually applies the given operation to its arguments. 
+
+Ex:
+
+List<Integer> lista = new ArrayList<Integer>();
+    lista.add(2);
+    lista.add(1);
+    lista.add(3);
+ 
+List<Integer> listb = new ArrayList<Integer>();
+    listb.add(2);
+    listb.add(1);
+
+BiConsumer<List<Integer>, List<Integer>> equals = (list1, list2) -> {
+    if(list1.size() != list2.size())
+        System.out.println("False");
+    else {
+        for (int i = 0; i < list1.size(); i++)
+            if (list1.get(i) != list2.get(i)) {
+                System.out.println("False");
+                return;
+            }
+        System.out.println("True");
+    }
+};
+        
+equals.accept(lista, listb);
+The above code checks elems from "lista" & "listb". If the elems are not same, this will return by printing "False".
+
+andThen(): Same as Consumer<T> interface. It takes a BiConsumer as a param. The andThen() method is run after "accept()".
+
+Ex: Extending the above code.
+
+BiConsumer<List<Integer>, List<Integer>> disp = (list1, list2) -> {
+    list1.stream().forEach(a -> System.out.print(a + " "));
+    System.out.println();
+
+    list2.stream().forEach(a -> System.out.print(a + " "));
+    System.out.println();
+}
+
+equals.andThen(disp).accept(lista, listb);
+
+First the "accept()" will run and print "False" as the elems in bith list are not same. Then the "andThen()" will run which will print the individual elements
+from both lista & listb.
+
+disp.andThen(equals).accept(lista, listb);  // "accept()" will run as per it is defined in the "disp" consumer. That means it will print individual elems
+from lista & listb. Then andThen() method wi run which will throw an index of out bounds error coz the listb.size() < lista.size().
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+3. PREDICATE INTERFACE
+
+In mathematical logic, a predicate is a function that receives a value and returns a boolean value.
+
+The Predicate functional interface is a specialization of a Function that receives a generified value and returns a boolean. A typical use case of the 
+Predicate lambda is to filter a collection of values:
+
+List<String> names = Arrays.asList("Angela", "Aaron", "Bob", "Claire", "David");
+
+List<String> namesWithA = names.stream().filter(name -> name.startsWith("A")).collect(Collectors.toList());
+
+It improves manageability of code, helps in unit-testing them separately, and contain some methods like:
+
+i. static Predicate isEqual(Object targetRef) : Returns a predicate that tests if two arguments are equal according to Objects.equals(Object, Object). 
+
+ii. default Predicate and(Predicate other) : Returns a composed predicate that represents a short-circuiting logical AND of this predicate and another. 
+
+iii. default Predicate negate() : Returns a predicate that represents the logical negation of this predicate. 
+
+iv. default Predicate or(Predicate other) : Returns a composed predicate that represents a short-circuiting logical OR of this predicate and another. 
+
+v. boolean test(T t) : Evaluates this predicate on the given argument.boolean test(T t) 
+
+"test()" is the only abstract method. All other methods are default
+
+Ex: 
+Predicate<Integer> lesserthan = i -> (i < 18);  
+  
+System.out.println(lesserthan.test(10));   // true coz 10 < 18
+
+Predicate<Integer> greaterThanTen = (i) -> i > 10; 
+
+boolean result = greaterThanTen.and(lowerThanTwenty).test(15);      // true
+The above code chains 2 predicate statements. The test() method of both "greaterThanTen" & "lowerThanTwenty" will be run and if both returns true, Then
+the result var will be true.
+
+boolean result2 = greaterThanTen.and(lowerThanTwenty).negate().test(15);     // false
+The above code chains 2 predicate functions and negates their result with 15.
+
+static void pred(int number, Predicate<Integer> predicate) { 
+    if (predicate.test(number))
+        System.out.println("Number " + number); 
+}
+public static void main(String[] args) { 
+        pred(10, (i) -> i > 7); 
+} 
+
+Predicate<String> hasLengthOf10 = new Predicate<>(){
+    public boolean test(String t) return t.length() > 10;
+}
+
+Predicate<String> containsLetterA = p -> p.contains("A"); 
+String str = "And"; 
+boolean outcome = hasLengthOf10.or(containsLetterA).test(str); 
+
+The "str" var will be passed to both hasLengthOf10 & containsLetterA predicates. If any 1 returns true, outcome var will be true.
+
+String movie = "Thunderstruck is a 2012 children film starring Kevin Durant"; 
+  
+boolean outcome = hasLengthOf10.negate().test(movie); 
+"test()" method will check if "movie" var is > 10. The negate() will invert the result of test() method.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+List<User> users = new ArrayList<User>(); 
+    users.add(new User("John", "admin")); 
+    users.add(new User("Peter", "member")); 
+
+List admins = process(users, (User u) -> u.getRole().equals("admin"));  
+        
+public List<User> process(User, Predicate<User> predicate){
+    List<User> result = new ArrayList<User>();
+
+    for (User user: users){
+        if (predicate.test(user)) result.add(user);
+    }
+    return result;
+}
+
+The Stream API allows "streaming" of collections for dynamic processing. Streams allow concurrent and parallel computation on data (using internal iterations), 
+to support database-like operations such as grouping and filtering the data (similar to GROUP BY and WHERE clause in SQL). This allows the developers to focus 
+on "what data is needed" instead of "how data is needed" since streaming hides the details of the implementation and provides the result. This is done by 
+providing predicates as inputs to functions operating at runtime upon the streams of collections
+
+For the above example of List<User>, we can write a stream function.
+
+List<Users> admin = users.stream()
+                         .filter(user -> user.getRole().equals("admin"))
+                         .collect(Collectors.toList());
+
+filter() is a intermediate method in stream API which accepts a Predicate as a param.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+3. FUNCTION INTERFACE:
+
+It represents a function which takes in one argument and produces a result. This functional interface takes in 2 generics namely as follows:
+
+    T: denotes the type of the input argument
+    R: denotes the return type of the function
+
+Remenber, we mapped our User and Customer object in the whiteboard and other project to UserDTO & CustomerDTO objects. We implemented this Function<User, UserDTO>
+interface. The User object was converted to UserDTO object to send it to client.
+
+The Function interface consists of the following 4 methods:
+
+1. R apply(T t)  --> 1 param of type "T" & return type of "R". It is the abstract method
+
+Function<Integer, Double> half = a -> a / 2.0;
+ 
+System.out.println(half.apply(10));     // prints 5.0
+
+2. default <V> Function<T, V> andThen(Function<? super R, ? extends V> after)
+
+It returns a composed function wherein the parameterized function will be executed after the first one. If evaluation of either function throws an error, 
+it is relayed to the caller of the composed function. V is the type of output of the after function, and of the composed function
+
+Function<Integer, Double> half = a -> a / 2.0;
+ 
+half = half.andThen(a -> 3 * a);
+
+System.out.println(half.apply(10));        // prints 15.0
+
+"half" function halves the elem and then "andThen()" method multiplies the halved value with 3.
+
+3. default <V> Function<V, R> compose(Function<? super V, ? extends T> before)
+This method is opposite of "andThen()".
+
+It returns a composed function wherein the parameterized function "before" will be executed first and then the first one. If evaluation of either function 
+throws an error, it is relayed to the caller of the composed function. V is the type of output of the after function, and of the composed function
+
+Function<Integer, Double> half = a -> a / 2.0;
+ 
+half = half.compose(a -> 3 * a);
+ 
+System.out.println(half.apply(5));         /// prints 7.5 --> 5*3 = 15   -->   15/2.0 = 7.5
+
+Function<Integer, String> intToString = Object::toString;     // converts Integer to string
+Function<String, String> quote = s -> "-" + s + "-";          // adds "-" around the string.
+
+Function<Integer, String> quoteIntToString = quote.compose(intToString);
+
+quoteIntToString.apply(5);       //  "-5-"
+
+intToString function is run first, thus converts 5 to "5". Then "qoute" function runs, adds "-" around 5
+
+4. static <T> Function<T, T> identity()
+
+This method returns a function that returns its input argument. T denotes the type of the argument and the value to be returned.
+
+Function<Integer, Integer> i = Function.identity();
+ 
+System.out.println(i.apply(10));     // prints 10
+
+One of the usages of the Function type in the standard library is the Map.computeIfAbsent method. This method returns a value from a map by key, 
+but calculates a value if a key is not already present in a map.
+
+Integer value = map.computeIfAbsent("John", s -> s.length());
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+4. SUPPLIER INTERFACE
+The Supplier functional interface does not take any arguments. We typically use it for lazy generation of values
+
+It represents a function which does not take in any argument but produces a value of type T. This functional interface takes in only one generic namely:-
+
+    T: denotes the type of the result
+
+The lambda expression assigned to an object of Supplier type is used to define its get() which eventually produces a value. Suppliers are useful when 
+we don’t need to supply any value and obtain a result at the same time.
+
+The Supplier interface consists of only one function:
+ 
+T get():
+
+Supplier<Double> randomValue = () -> Math.random(); 
+
+System.out.println(randomValue.get());    // prints some random value
+
+EX:
+public double squareLazy(Supplier<Double> lazyValue) {
+    return Math.pow(lazyValue.get(), 2);
+}
+
+Supplier<Double> lazyValue = () -> {
+    Uninterruptibles.sleepUninterruptibly(1000, TimeUnit.MILLISECONDS);        // Guava method to sleep
+    return 9d;
+};
+
+Double valueSquared = squareLazy(lazyValue);
+
+Another use case for the Supplier is defining logic for sequence generation. To demonstrate it, let’s use a static Stream.generate method to create a Stream of 
+Fibonacci numbers:
+
+int[] base = {0, 1};
+
+Stream<Integer> fibonacci = Stream.generate(() -> {
+    int result = base[1];
+    int next = base[0] + base[1];
+
+    base[0] = base[1];
+    base[1] = next;
+
+    return result;
+}).limit(n)             --> generates a fibonacci sequence of upto 10 numbers.
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+OPERATORS:
+
+Operator interfaces are special cases of a function that receive and return the same value type. The UnaryOperator interface receives a single argument. 
+One of its use cases in the Collections API is to replace all values in a list with some computed values of the same type:
+
+List<String> names = Arrays.asList("bob", "josh", "megan");
+
+names.replaceAll(name -> name.toUpperCase());
+
+We could have used a method reference: names.replaceAll(String::toUpperCase);
+
+The List.replaceAll function returns void as it replaces the values in place. To fit the purpose, the lambda used to transform the values of a list has to return 
+the same result type as it receives. This is why the UnaryOperator is useful here.
+
+BinaryOperator is a used for reduction operation. Suppose we want to aggregate a collection of integers in a sum of all values. With Stream API, 
+we could do this using a collector, but a more generic way to do it would be to use the reduce method:
+
+List<Integer> values = Arrays.asList(3, 5, 8, 9, 12);
+
+int sum = values.stream().reduce(0, (i1, i2) -> i1 + i2);
+
+The "reduce" method receives an initial accumulator value and a BinaryOperator function. The arguments of this function are a pair of values of the same type; 
+the function itself also contains a logic for joining them in a single value of the same type. The passed function must be associative, which means that 
+the order of value aggregation does not matter, i.e. the following condition should hold:
+
+op.apply(a, op.apply(b, c)) == op.apply(op.apply(a, b), c);
+
+The associative property of a BinaryOperator operator function allows us to easily parallelize the reduction process.

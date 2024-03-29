@@ -1,0 +1,85 @@
+SCHEDULING TASKS IN SPRING
+
+@Scheduled annotation can be used to configure and schedule tasks.
+Whatever method we are trying to schedule, that method should not have a return type other that "void". Even if it has a retutn type, the return
+value will be ignored.
+
+To enable support for a class for scheduling its method:
+Use @EnableScheduling annotation.
+
+@Configuration
+@EnableScheduling
+public class SpringConfig {
+    ...
+}
+
+We can schedule a task at fix delay by: @Scheduled(fixedDelay = 1000)
+
+@Scheduled(fixedDelay = 1000)
+public void scheduleFixedDelayTask() {
+    System.out.println(
+      "Fixed delay task - " + System.currentTimeMillis() / 1000);
+}
+
+This means that that there will a gap of 1000 ms between the end of one task and the start of next task. That task will wait tills the previous task finishes.
+
+We can schedule a task at fixed delay by: @Scheduled(fixedRate = 1000)
+
+@Scheduled(fixedRate = 1000)
+public void scheduleFixedRateTask() {
+    System.out.println(
+      "Fixed rate task - " + System.currentTimeMillis() / 1000);
+}
+
+This option should be used when each execution of the task is independent.
+Scheduled tasks don’t run in parallel by default. So even if we used fixedRate, the next task won’t be invoked until the previous one is done.
+
+Fixed Rate vs Fixed Delay:
+
+The fixedDelay property makes sure that there is a delay of n millisecond between the finish time of an execution of a task and the start time 
+of the next execution of the task. 
+This property is specifically useful when we need to make sure that only one instance of the task runs all the time. For dependent jobs, it is quite helpful.
+
+The fixedRate property runs the scheduled task at every n millisecond. It doesn’t check for any previous executions of the task.
+This is useful when all executions of the task are independent. If we don’t expect to exceed the size of the memory and the thread pool, fixedRate should be 
+quite handy.
+
+Although, if the incoming tasks do not finish quickly, it’s possible they end up with “Out of Memory exception”.
+
+Schedule a Task With Initial Delay: @Scheduled(fixedDelay = 1000, initialDelay = 1000)
+The task will be executed the first time after the initialDelay value, and it will continue to be executed according to the fixedDelay.
+
+This option is convenient when the task has a setup that needs to be completed.
+
+Schedule a Task Using Cron Expressions: @Scheduled(cron = "0 15 10 15 * ?")
+
+@Scheduled(cron = "0 15 10 15 * ?")
+public void scheduleTaskUsingCronExpression() {
+ 
+    long now = System.currentTimeMillis() / 1000;
+    System.out.println(
+      "schedule tasks using cron jobs - " + now);
+}
+
+@Scheduled(cron = "0 15 10 15 * ?", zone = "Europe/Paris")  --> "zone" attribute to change time zone
+
+
+We can use params for @Scheduled annotation using .properties file -->
+
+@Scheduled(fixedDelayString = "${fixedDelay.in.milliseconds}")
+@Scheduled(fixedRateString = "${fixedRate.in.milliseconds}")
+@Scheduled(cron = "${cron.expression}")
+
+By default, Spring uses a local single-threaded scheduler to run the tasks. As a result, even if we have multiple @Scheduled methods, 
+they each need to wait for the thread to complete executing a previous task.
+
+If our tasks are truly independent, it’s more convenient to run them in parallel. For that, we need to provide a TaskScheduler that better suits our needs:
+
+@Bean
+public TaskScheduler  taskScheduler() {
+    ThreadPoolTaskScheduler threadPoolTaskScheduler = new ThreadPoolTaskScheduler();
+    threadPoolTaskScheduler.setPoolSize(5);
+    threadPoolTaskScheduler.setThreadNamePrefix("ThreadPoolTaskScheduler");
+    return threadPoolTaskScheduler;
+}
+

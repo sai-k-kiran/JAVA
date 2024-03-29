@@ -1,0 +1,180 @@
+WHAT IS VARIANCE?
+
+Variance refers to how subtyping between more complex types relates to subtyping between their components.
+“More complex types” here refers to higher level structures like containers and functions. So, variance is about the assignment compatibility between 
+containers and functions composed of parameters that are connected via a Type Hierarchy.
+
+1. INVARIANCE:
+
+If A is a super class of B, then GenericType<A> is not a supertype of GenericType<B> and vice versa.
+This means these two types have no relation to each other and neither can be exchanged for the other under any circumstance.
+If we have a type T, then only type T is allowed in the context. No sub or supertypes are allowed
+
+Collections are invariant. We cant pass List<Integer> to a method expecting Collection<Number>
+
+    // Type hierarchy: Person :> Joe :> JoeJr
+
+    List<Person> p = new ArrayList<Joe>();    // COMPILE ERROR (a bit counterintuitive, but remember List<Person> is invariant)
+    List<Joe> j = new ArrayList<Person>();    // COMPILE ERROR
+
+You can add objects to them:
+
+    List<Person> p = new ArrayList<>();
+    p.add(new Person());     // ok
+    p.add(new Joe());        // ok
+    p.add(new JoeJr());      // ok
+
+You can read objects from them:
+
+    List<Joe> joes = new ArrayList<>();
+    Joe j = joes.get(0);          // ok
+    Person p = joes.get(0);       // ok
+
+Invariance shift our errors and exceptions from compile time to runtime
+
+public static void main(String[] args){
+    String[] arr = new String[3];
+    doSomething(arr);
+}
+
+void doSomething(Object[] arr){
+    System.out.println(arr[0] * arr[1])  // this will throw an error saying strings cant be multiplied.
+}
+
+The 2 methods will compile without any errors. but when we run them, the "doSomething()" will throw an error.
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+2. COVARIANCE:
+
+If B is a subtype of A, then GenericType<B> is a subtype of GenericType<? extends A>. Arrays in Java have always been covariant.
+If we have a type T, then only T and subtypes of T are allowed in the context. It is represented by Upper Bounded wildcard <? extends T>
+
+You can pass Integer[] to a method that accepts Object[] coz Integer[] is subtype of Object[]. If the method inserts a supertype of Integer, an "ArrayStoreException" 
+is thrown at runtime.
+
+We can pass List<Integer> to a method expecting Collection<? extends Number>
+
+NOTE: It is used when we want to retrieve an elements of a collection & not alter the extended collection(adding etc.)
+
+public static void main(String... args) {
+    Number[] numbers = new Number[]{1, 2, 3, 4, 5};
+    trick(numbers);   // passing Number[] as param.
+}
+ 
+private static void trick(Object[] objects) {
+    objects[0] = new Float(123);    // ok
+    objects[1] = new Object();      // ArrayStoreException thrown at runtime, cannot pass supertype of Number
+}
+
+Covariance is allowed in arrays but not in generics. 
+EX: Type Hierarchy: Animal :> Feline :> Tiger, Animal :> Dog
+
+    List<Feline> felines = new ArrayList<>();
+    fList(felines);    // compiler error. We are passing a list of feline. In the fList() method, we are adding a "Dog". This Dog object will be added to the
+                       // List<Feline> which is wrong. The fList() method has its own mind, it does its jobs correctly (adding Dog object to List<Animal> is 
+                       // perfectly fine). But if we passed a List<Feline> to fList(), we cant add Dog object to List. 
+
+    void fList(List<Animal> list){
+        ...
+        list.add(new Dog());  // ok coz Dog is a sub class of Animal but not feline;
+    } 
+
+To solve above problem, we have to change fList() method param such that the fList() method accepts List of Animal or its sub class.
+
+    void fList(List<? extends Animal> list){     // accepts list of Animal or its subtype
+        ...
+        list.add(new Dog());  // This is wrong now coz we dont know what subtype of Animal we are gonna pass. It could be either Animal, Feline, Tiger or Dog.
+                              // But we dont know for sure, so we should avoid adding to list.
+    }
+
+List<? extends Joe> = new ArrayList<Joe>();      // ok
+List<? extends Joe> = new ArrayList<JoeJr>();    // ok
+List<? extends Joe> = new ArrayList<Person>();   // COMPILE ERROR, cant make list of supertype. only subtype & same type is allowed
+
+
+To get the elements of list:
+
+List<? extends Joe> joes = new ArrayList<>();     // Reference var should be supertype of elements in list
+Joe j = joes.get(0); // ok 
+Person p = joes.get(0); // ok
+JoeJr jr = joes.get(0); // compile error (you don't know what subtype of Joe is in the list), reference variable(JoeJr jr) is a subtype of Joe
+
+Adding to list, this operation is not allowed. Compiler will throw an error. But we add "null".
+
+List<? extends Joe> joes = new ArrayList<>();
+joes.add(new Joe());  // compile error (you don't know what subtype of Joe is in the list) SEE NOTE
+joes.add(new JoeJr()); // compile error (ditto)
+joes.add(new Person()); // compile error (intuitive)
+joes.add(new Object()); // compile error (intuitive)
+
+NOTE: Adding any type of object is prohibited coz suppose you added a subtype of Joe "Jill". Then how will you access the "Jill" object from the list. 
+    A programmer may dont know what type of objects are there in the list. 
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+3. CONTRAVARIANCE:
+
+If A is a supertype of B, then GenericType<A> is a supertype of GenericType<? super B>.
+If we have a type T, then only T and super types of T are allowed in the context. It is represented by Lower Bounded wildcard <? super T>
+
+It is used to alter(add) the elements to a collection and not retrieving the elements from the collection.
+
+EX:
+    List<Feline> felines = new ArrayList<>();
+    contraList(felines);
+
+    void contraList(List<Tiger> list){
+
+    }
+
+We are passing List<Feline> to contraList which accepts List<Tiger>. Feline is super class of Tiger. Still we cant pass List<Feline> to the contraList.
+We have to modify param to accept the super type of Tiger.
+
+    void contraList(List<? super Tiger> list){
+
+    }
+
+    List<? super Tiger> means it accepts Tiger or its supertype as generic.
+
+List<? super Joe> joes = new ArrayList<Joe>();      // ok, <? super Joe> accepts type that is either same or super type of Joe 
+List<? super Joe> joes = new ArrayList<Person>();   // ok
+List<? super Joe> joes = new ArrayList<JoeJr>();    // COMPILE ERROR, JoeJr is subtype of Joe
+
+List<? super Joe> joes = new ArrayList<>();
+Joe j = joes.get(0);        // compile error (could be Object or Person)
+Person p = joes.get(0);     // wrong but Person p = (Person)joes.get(0) is allowed.
+Object o = joes.get(0);     // ok coz "Object" is the supertype of all objects.
+
+As we can pass a supertype into the list, we dont know what supertype it could be. In the above list, we could have passed an object and do Person p = joes.get(0); 
+This will give an error as object cannot be cast to Person. Forceful casting can be done Person p = (Person)joes.get(0);
+
+You can add subtypes of the “lower bound”:
+
+List<? super Joe> joes = new ArrayList<>();
+joes.add(new JoeJr());      // allowed coz then you can do Joe j = joes.get(0), Person p = joes.get(0) or Object o = joes.get(0)
+
+But you cannot add supertypes:
+
+List<? super Joe> joes = new ArrayList<>();
+joes.add(new Person()); // compile error (again, could be a list of Object or Person or Joe)
+joes.add(new Object()); // compile error (ditto)
+
+public static void main(String[] args){
+    List<Object> list = new ArrayList<>();
+    doSomething(list);
+    list.add("text");        // This is OK. The list contains = [1,2,3,4,5,"text"]. But how can you retrieve(or sum) them? One elem is String
+}
+
+void doSomething(Collection<? super Integer> list){
+    IntStream.rangeClosed(1, 5).forEach(e -> list.add(e));  // adds [1, 2, 3, 4, 5] 
+}
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+4. BIVARIANCE:
+
+A generic type with an unbounded wildcard is a supertype of all bounded variations of the same generic type. Eg. GenericType<?> is a supertype of 
+GenericType<String>. The super type of String is Object so think of GenericType<?> as GenericType<Object>.
+
+5. PRODUCER EXTENDS CONSUMER SUPER (PECS):
+Use extends when you want to get elements out of a structure. 
+Use super when you only put elements into a structure. Dont use a wildcard when you get and put.
