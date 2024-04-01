@@ -576,3 +576,28 @@ The behavior of the findFirst method does not change in the parallel scenario. I
 		List<Integer> ans = list.stream()
 		                        .filter(i -> list1.contains(i))
 		                        .collect(Collectors.toList());
+
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+	Employee[] employees = {
+         new Employee("J", "Red", 51000, "IT"),
+         new Employee("A", "Green", 71600, "IT"),
+         new Employee("M", "Black", 35187.5, "Sales"),
+         new Employee("K", "Yellow", 47100.77, "Marketing"),
+         new Employee("L", "Pink", 62001, "IT"),
+         new Employee("D", "Blue", 32001, "Sales"),
+         new Employee("W", "Brown", 42361.4, "Marketing")};
+
+       List<Employee> list = Arrays.asList(employees);
+      
+       long n = list.stream().filter(emp -> emp.department.equals("Marketing")).count();
+       System.out.println(n);     // count no. of employees in "Marketing dept"
+		
+	Map<String, Long> employeeCountByDepartment = list.stream()
+             .collect(Collectors.groupingBy(e -> e.department, HashMap::new, Collectors.counting()));  // group the emp by their dept
+             
+        Map<String, Long> sorted = employeeCountByDepartment.entrySet().stream()
+          .sorted(Map.Entry.comparingByValue())
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new)); // sort by emp count in a dept
+                
+      sorted.forEach((department, count) -> System.out.println(department +" - "+ count));
